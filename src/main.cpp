@@ -1,9 +1,15 @@
-#include <opencv2/opencv.hpp>
 #include <iostream>
+#include <filesystem>
 
-cv::Mat img, result, mask, edges, output;
+#include "../include/BoundingBoxes.hpp"
+#include "opencv4/opencv2/imgcodecs.hpp"
+#include "opencv4/opencv2/highgui.hpp"
+
+
+cv::Mat result, mask, edges, output;
 int threshold_value = 53;
 
+/*
 void on_trackbar(int, void*) {
     // Apply the threshold to create a binary mask
     result = img.clone();
@@ -44,50 +50,39 @@ void on_trackbar(int, void*) {
     cv::imshow("Edges", edges);
     cv::imshow("Detected Parking Lines", output);
 }
-
-int main() {
-    // Load the image
-    img = cv::imread("/home/trigger/Documents/GitHub/Parking_lot_occupancy/ParkingLot_dataset/sequence0/frames/2013-02-24_10_05_04.jpg");
-    if (img.empty()) {
-        std::cout << "Error opening the image" << std::endl;
+*/
+int main(int argc, char** argv) {
+    if (argc < 2) {
+        std::cerr << "Usage: " << argv[0] << " <frames_directory>" << std::endl;
         return -1;
     }
 
-    // Define the ROI
-    std::vector<cv::RotatedRect> rois;
-    rois.push_back(cv::RotatedRect(cv::Point2f(572, 317), cv::Size2f(771, 282), 58));  // Adjust the position and angle as needed
-    rois.push_back(cv::RotatedRect(cv::Point2f(950, 200), cv::Size2f(165, 710), -54));  // Adjust the position and angle as needed
-    rois.push_back(cv::RotatedRect(cv::Point2f(1136, 105), cv::Size2f(73, 467), 118));  // Adjust the position and angle as needed
-
-    std::vector<cv::RotatedRect> black_rois;
-    black_rois.push_back(cv::RotatedRect(cv::Point2f(799, 343), cv::Size2f(1227, 125), 46));  // Adjust the position and angle as needed
-    black_rois.push_back(cv::RotatedRect(cv::Point2f(326, 3), cv::Size2f(62, 113), 50));  // Adjust the position and angle as needed
-    black_rois.push_back(cv::RotatedRect(cv::Point2f(861, 25), cv::Size2f(552, 64), 33));  // Adjust the position and angle as needed
-
-    mask = cv::Mat::zeros(img.size(), CV_8UC1);
-
-    // Create mask for the ROIs
-    for (const auto& roiRect : rois) {
-        cv::Point2f vertices[4];
-        roiRect.points(vertices);
-        std::vector<cv::Point> contour;
-        for (int j = 0; j < 4; j++) {
-            contour.push_back(vertices[j]);
-        }
-        cv::fillConvexPoly(mask, contour, cv::Scalar(255));
+    std::filesystem::path pathSequenceFramesDir = std::filesystem::absolute(argv[1]);
+    if (!std::filesystem::exists(pathSequenceFramesDir) || !std::filesystem::is_directory(pathSequenceFramesDir)) {
+        std::cerr << "Input directory does not exist or is not a directory." << std::endl;
+        return -1;
     }
 
-    // Affine the ROIs using black rotatedRects
-    for (const auto& blackRoiRect : black_rois) {
-        cv::Point2f vertices[4];
-        blackRoiRect.points(vertices);
-        std::vector<cv::Point> contour;
-        for (int j = 0; j < 4; j++) {
-            contour.push_back(vertices[j]);
+    for (const auto& iter : std::filesystem::directory_iterator(pathSequenceFramesDir)) {
+        std::string imgPath = iter.path().string();
+
+        // Load the image
+        cv::Mat inputImg = cv::imread(imgPath);
+        if (inputImg.empty()) {
+            std::cout << "Error opening the image" << std::endl;
+            return -1;
         }
-        cv::fillConvexPoly(mask, contour, cv::Scalar(0));
+        BoundingBoxes BBoxes = BoundingBoxes(inputImg);
+
+        cv::Mat test = BBoxes.getImg();
+        cv::namedWindow("mongus", cv::WINDOW_AUTOSIZE);
+        cv::imshow("mongus", test);
+        cv::waitKey(0);
     }
 
+
+
+    /*
     // Create windows
     cv::namedWindow("Thresholded Image", cv::WINDOW_AUTOSIZE);
     cv::namedWindow("Edges", cv::WINDOW_AUTOSIZE);
@@ -101,6 +96,6 @@ int main() {
 
     // Wait until user exits the program
     cv::waitKey(0);
-
+    */
     return 0;
 }

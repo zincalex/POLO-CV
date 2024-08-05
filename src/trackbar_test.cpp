@@ -4,7 +4,7 @@
 using namespace cv;
 using namespace std;
 
-typedef struct ROIParams{
+typedef struct Params{
     Mat img, gray;
     Mat dest, roi;
 
@@ -24,9 +24,6 @@ typedef struct ROIParams{
 static void RoiFunct(int, void* userdata){
 
     CannyParams &params = *((CannyParams*)userdata);
-
-
-
     vector<RotatedRect> rois;
     rois.push_back(RotatedRect(Point2f(params.x_coord_center, params.y_coord_center), Size2f(params.width, params.height), params.angolo));  // Adjust the position and angle as needed
     //rois.push_back(RotatedRect(Point2f(950, 200), Size2f(200, 670), -56));  // Adjust the position and angle as needed

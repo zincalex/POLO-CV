@@ -6,8 +6,8 @@ find_package( OpenCV REQUIRED )
 include_directories( ${OpenCV_INCLUDE_DIRS} )
 
 add_library(BBox
-        include/BoundingBox.hpp
-        src/BoundingBox.cpp
+        include/BoundingBoxes.hpp
+        src/BoundingBoxes.cpp
 )
 
 add_executable(${PROJECT_NAME}

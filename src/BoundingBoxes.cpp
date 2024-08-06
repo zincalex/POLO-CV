@@ -48,7 +48,6 @@ cv::Mat BoundingBoxes::createROI(const cv::Mat& input) { // We focus the analysi
     return result;
 }
 
-
 cv::Mat BoundingBoxes::gamma_correction(const cv::Mat& input, const double& gamma) {
     cv::Mat img_float, img_gamma;
 
@@ -68,7 +67,6 @@ cv::Mat BoundingBoxes::niBlack_thresholding(const cv::Mat& input, const int& blo
 }
 
 cv::Mat BoundingBoxes::saturation_thresholding(const cv::Mat& input, const unsigned int& satThreshold) {
-
     cv::Mat hsv_image, saturation;
 
     cv::cvtColor(input, hsv_image, cv::COLOR_BGR2HSV);
@@ -86,10 +84,10 @@ BoundingBoxes::BoundingBoxes(const cv::Mat &input) {
     int kernelSize = 5;
     int lowThreshold = 100;
     int ratio = 22;
-    double GAMMA = 1.8;
+    double GAMMA = 2.5;
     const unsigned int NIBLACK_BLOCK_SIZE = 19;
     const double NIBLACK_K = 0.7;
-    const unsigned int SATURATION_THRESHOLD = 30;
+    const unsigned int SATURATION_THRESHOLD = 100;         // 30
     cv::Mat roiGray, roiCanny;
 
     // Image Preprocessing
@@ -97,68 +95,38 @@ BoundingBoxes::BoundingBoxes(const cv::Mat &input) {
 
 
     // TODO might consider something with HSV, dont know yet
-    //cv::Mat hsvRoiInput;
-    //cv::cvtColor(roiInput, hsvRoiInput, cv::COLOR_BGR2HSV);
-
-
-
     cv::Mat image = roiInput.clone();
     cv::Mat gc_image = gamma_correction(image, GAMMA);
-    cv::imshow("Gamma", gc_image);
-    cv::waitKey(0);
-    cv::Mat saturation = saturation_thresholding(image, SATURATION_THRESHOLD);
-    cv::imshow("Sat", saturation);
-    cv::waitKey(0);
+    //cv::imshow("Gamma", gc_image);
+    //cv::waitKey(0);
+    cv::Mat saturation = saturation_thresholding(gc_image, SATURATION_THRESHOLD);
+    //cv::imshow("Sat", saturation);
+    //cv::waitKey(0);
     cv::Mat niblack = niBlack_thresholding(image, NIBLACK_BLOCK_SIZE, NIBLACK_K);
     cv::imshow("NI", niblack);
     cv::waitKey(0);
-
-    /*
-    cv::Mat mask = saturation & niblack;
-    cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(CLOSE_KERNEL_SIZE, CLOSE_KERNEL_SIZE)));
-    cv::dilate(mask, mask, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(DILATE_KERNEL_SIZE, DILATE_KERNEL_SIZE)));
-    fill_holes(mask);
-    //cv::imshow("mongus", mask);
-    //cv::waitKey(0);
-
-    */
-
 
     cvtColor( roiInput, roiGray, cv::COLOR_BGR2GRAY );
     GaussianBlur(roiGray, roiGray, cv::Size(kernelSize,kernelSize), 0);
     Canny( roiGray, roiCanny, lowThreshold, lowThreshold*ratio, kernelSize );
 
 
-    cv::imshow("mongus", roiCanny);
+    cv::imshow("Canny", roiCanny);
     cv::waitKey(0);
 
+    cv::Mat mask = niblack | roiCanny;
+
+
     // MORFOLOGIAL OPERATION ----> ELIMINATE ALL THE IMAGE
-    /*
-    int erosion_size = 3;
-    Mat element = getStructuringElement(MORPH_RECT,
-                                        Size(erosion_size, erosion_size));
-    cv::morphologyEx(roiCanny, roiCanny, cv::MORPH_CLOSE, element);
-    */
+    //cv::morphologyEx(mask, mask, cv::MORPH_OPEN, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3)));
 
-
-
-
-
-
-
-
-
-
-
-
-
+    cv::imshow("Final mask", mask);
+    cv::waitKey(0);
 
 
     // Hough Transform
     std::vector<cv::Vec4i> hough_lines;
-    cv::HoughLinesP(roiCanny, hough_lines, 1, CV_PI /180, 45, 25, 30);
-
-
+    cv::HoughLinesP(mask, hough_lines, 1, CV_PI /180, 50, 30, 10);
     cv::Mat hough_lines_image = input.clone();
     for (auto l : hough_lines) {
         cv::line(hough_lines_image, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]), cv::Scalar(0,0, 255));

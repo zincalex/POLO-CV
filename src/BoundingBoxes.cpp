@@ -79,7 +79,6 @@ cv::Mat BoundingBoxes::saturation_thresholding(const cv::Mat& input, const unsig
 }
 
 
-
 BoundingBoxes::BoundingBoxes(const cv::Mat &input) {
     int kernelSize = 5;
     int lowThreshold = 100;
@@ -93,9 +92,47 @@ BoundingBoxes::BoundingBoxes(const cv::Mat &input) {
     // Image Preprocessing
     cv::Mat roiInput = createROI(input);        // Focus on the parking lots, my ROI
 
-
     // TODO might consider something with HSV, dont know yet
     cv::Mat image = roiInput.clone();
+
+    // TODO new sequence (GOOD BUT gne)
+    cv::Mat gray;
+    cvtColor(image, gray, cv::COLOR_BGR2GRAY);
+    cv::Mat blurred;
+    int radius = 3;
+    int kernel = 2 * radius + 1;
+    GaussianBlur(gray, blurred, cv::Size(kernel, kernel), 0);
+    // Subtract the blurred image from the original image
+    cv::Mat highPass;
+    subtract(gray, blurred, highPass);
+    highPass = highPass + 128;
+    //cv::imshow("high", highPass);
+    //cv::waitKey(0);
+    cv::Mat otsuThresh;
+    threshold(highPass, otsuThresh, 0, 255, cv::THRESH_BINARY + cv::THRESH_OTSU);
+    //cv::imshow("otsu thresh", otsuThresh);
+    //cv::waitKey(0);
+    cv::medianBlur(otsuThresh, otsuThresh, 3);
+    //cv::imshow("otsu thresh AFTER", otsuThresh);
+    //cv::waitKey(0);
+
+
+    // TODO THIS sequence is real good
+    cv::Mat sugoi;
+
+    cvtColor( roiInput, roiGray, cv::COLOR_BGR2GRAY );
+    GaussianBlur(roiGray, roiGray, cv::Size(5,5), 0);
+    //cv::imshow("gray", roiGray);
+    //cv::waitKey(0);
+    int blockSize = 5; // Size of the pixel neighborhood used to calculate the threshold
+    int C = 2;          // Constant subtracted from the mean or weighted mean
+    cv::adaptiveThreshold(roiGray, roiGray, 255, cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY, blockSize, C);
+    cv::bitwise_not(roiGray, roiGray);
+    cv::medianBlur(roiGray, sugoi, 3);
+    //cv::imshow("adaptive", sugoi);
+    //cv::waitKey(0);
+
+
     cv::Mat gc_image = gamma_correction(image, GAMMA);
     //cv::imshow("Gamma", gc_image);
     //cv::waitKey(0);
@@ -103,23 +140,17 @@ BoundingBoxes::BoundingBoxes(const cv::Mat &input) {
     //cv::imshow("Sat", saturation);
     //cv::waitKey(0);
     cv::Mat niblack = niBlack_thresholding(image, NIBLACK_BLOCK_SIZE, NIBLACK_K);
-    cv::imshow("NI", niblack);
-    cv::waitKey(0);
+    //cv::imshow("NI", niblack);
+    //cv::waitKey(0);
+
 
     cvtColor( roiInput, roiGray, cv::COLOR_BGR2GRAY );
     GaussianBlur(roiGray, roiGray, cv::Size(kernelSize,kernelSize), 0);
     Canny( roiGray, roiCanny, lowThreshold, lowThreshold*ratio, kernelSize );
-
-
-    cv::imshow("Canny", roiCanny);
-    cv::waitKey(0);
-
-    cv::Mat mask = niblack | roiCanny;
-
-
-    // MORFOLOGIAL OPERATION ----> ELIMINATE ALL THE IMAGE
-    //cv::morphologyEx(mask, mask, cv::MORPH_OPEN, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3)));
-
+    //cv::imshow("Canny", roiCanny);
+    //cv::waitKey(0);
+    cv::Mat mask = sugoi | roiCanny;
+    cv::morphologyEx(mask, mask, cv::MORPH_ERODE, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3)));
     cv::imshow("Final mask", mask);
     cv::waitKey(0);
 

@@ -1,5 +1,6 @@
 #include <opencv2/opencv.hpp>
 #include <iostream>
+#include <filesystem>
 
 using namespace cv;
 using namespace std;
@@ -19,50 +20,38 @@ typedef struct Params{
     const int maxwidth = 1280;
     int angolo = -90;
     const int max_angolo = 90;
-} CannyParams;
+} gParams;
 
-static void RoiFunct(int, void* userdata){
 
-    CannyParams &params = *((CannyParams*)userdata);
-    vector<RotatedRect> rois;
-    rois.push_back(RotatedRect(Point2f(params.x_coord_center, params.y_coord_center), Size2f(params.width, params.height), params.angolo));  // Adjust the position and angle as needed
-    //rois.push_back(RotatedRect(Point2f(950, 200), Size2f(200, 670), -56));  // Adjust the position and angle as needed
-    //rois.push_back(RotatedRect(Point2f(900, 300), Size2f(200, 600), 30));  // Adjust the position and angle as needed
+int main(int argc, char** argv) {
 
-    // Draw the rotated rectangles and extract the ROIs
-    params.dest = params.img.clone();
-    int roiIndex = 0;
-    for (const auto& roiRect : rois) {
-        // Draw the rotated rectangle on the output image
-        Point2f vertices[4];
-        roiRect.points(vertices);
-        for (int j = 0; j < 4; j++) {
-            line(params.dest, vertices[j], vertices[(j + 1) % 4], Scalar(0, 255, 0), 2);
+    if (argc < 2) {
+        std::cerr << "Usage: " << argv[0] << " <frames_directory>" << std::endl;
+        return -1;
+    }
+
+    std::filesystem::path pathSequenceFramesDir = std::filesystem::absolute(argv[1]);
+    if (!std::filesystem::exists(pathSequenceFramesDir) || !std::filesystem::is_directory(pathSequenceFramesDir)) {
+        std::cerr << "Input directory does not exist or is not a directory." << std::endl;
+        return -1;
+    }
+
+    for (const auto& iter : std::filesystem::directory_iterator(pathSequenceFramesDir)) {
+        std::string imgPath = iter.path().string();
+
+        // Load the image
+        cv::Mat inputImg = cv::imread(imgPath);
+        if (inputImg.empty()) {
+            std::cout << "Error opening the image" << std::endl;
+            return -1;
         }
+        BoundingBoxes BBoxes = BoundingBoxes(inputImg);
 
-        // Extract and save the ROI
-        getRectSubPix(params.img, roiRect.size, roiRect.center, params.roi);
-        string roiName = "roi_" + to_string(roiIndex) + ".jpg";
-        //imwrite(roiName, params.roi);
-        roiIndex++;
+        cv::Mat test = BBoxes.getImg();
+        cv::namedWindow("mongus", cv::WINDOW_AUTOSIZE);
+        cv::imshow("mongus", test);
+        cv::waitKey(0);
     }
-
-    // Save the output image with the rectangles
-    if (!imwrite("output_with_rois.jpg", params.dest)) {
-        cout << "Failed to save the image at the specified path!" << endl;
-    } else {
-        cout << "Image saved successfully at output_with_rois.jpg" << endl;
-    }
-
-    // Display the output image
-    imshow("Output with ROIs", params.dest);
-
-}
-
-
-int main() {
-    // Load the image
-    string image_name = "/home/trigger/Documents/GitHub/Parking_lot_occupancy/ParkingLot_dataset/sequence0/frames/2013-02-24_10_05_04.jpg";
 
     // Apply Bilateral Filter to reduce noise while keeping edges sharp
 

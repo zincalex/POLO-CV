@@ -1,28 +1,11 @@
 #include "../include/BoundingBoxes.hpp"
 
-using namespace cv;
-using namespace std;
 
 const unsigned int CLOSE_KERNEL_SIZE = 9;
 const unsigned int DILATE_KERNEL_SIZE = 5;
 const unsigned int MIN_AREA_THRESHOLD = 6000;
 const unsigned int MAX_AREA_THRESHOLD = 60000;
 const unsigned int CIRCLE_NEIGHBORHOOD = 5;
-
-double computeAverageGrayscale(const Mat& gray, const RotatedRect& rect) {
-    Mat mask = Mat::zeros(gray.size(), CV_8UC1);
-    Point2f vertices[4];
-    rect.points(vertices);
-    vector<Point> pts;
-    for (int i = 0; i < 4; i++) {
-        pts.push_back(vertices[i]);
-    }
-    fillConvexPoly(mask, pts, Scalar(255));
-    Scalar meanValue = mean(gray, mask);
-    return meanValue[0];
-}
-
-
 
 
 cv::Mat BoundingBoxes::createROI(const cv::Mat& input) { // We focus the analysis of the image on the parking lots
@@ -66,13 +49,48 @@ cv::Mat BoundingBoxes::createROI(const cv::Mat& input) { // We focus the analysi
 }
 
 
+cv::Mat BoundingBoxes::gamma_correction(const cv::Mat& input, const double& gamma) {
+    cv::Mat img_float, img_gamma;
+
+    input.convertTo(img_float, CV_32F, 1.0 / 255.0);    // Convert to float and scale to [0, 1]
+    cv::pow(img_float, gamma, img_gamma);               // Gamma correction
+    img_gamma.convertTo(img_gamma, CV_8UC3, 255.0);       // Convert back to 8-bit type
+
+    CV_Assert(img_gamma.type() == CV_8UC3);
+    return img_gamma;
+}
+
+cv::Mat BoundingBoxes::niBlack_thresholding(const cv::Mat& input, const int& blockSize, const double& k) {
+    cv::Mat gray_image, niblack;
+    cv::cvtColor(input, gray_image, cv::COLOR_BGR2GRAY);
+    cv::ximgproc::niBlackThreshold(gray_image, niblack, 255, cv::THRESH_BINARY, blockSize, k, cv::ximgproc::BINARIZATION_NIBLACK);
+    return niblack;
+}
+
+cv::Mat BoundingBoxes::saturation_thresholding(const cv::Mat& input, const unsigned int& satThreshold) {
+
+    cv::Mat hsv_image, saturation;
+
+    cv::cvtColor(input, hsv_image, cv::COLOR_BGR2HSV);
+    cv::extractChannel(hsv_image, saturation, 1);
+
+    // Thresholding
+    cv::threshold(saturation, saturation, satThreshold, 255, cv::THRESH_BINARY);
+
+    return saturation;
+}
+
+
 
 BoundingBoxes::BoundingBoxes(const cv::Mat &input) {
     int kernelSize = 5;
     int lowThreshold = 100;
     int ratio = 22;
+    double GAMMA = 1.8;
+    const unsigned int NIBLACK_BLOCK_SIZE = 19;
+    const double NIBLACK_K = 0.7;
+    const unsigned int SATURATION_THRESHOLD = 30;
     cv::Mat roiGray, roiCanny;
-
 
     // Image Preprocessing
     cv::Mat roiInput = createROI(input);        // Focus on the parking lots, my ROI
@@ -82,72 +100,20 @@ BoundingBoxes::BoundingBoxes(const cv::Mat &input) {
     //cv::Mat hsvRoiInput;
     //cv::cvtColor(roiInput, hsvRoiInput, cv::COLOR_BGR2HSV);
 
-    auto gamma_correction = [](const cv::Mat& input) -> cv::Mat
-    {
-        // Gamma correction
-        cv::Mat gc_image;
-        cv::Mat lookUpTable(1, 256, CV_8U);
-        uchar* p = lookUpTable.ptr();
-        for (int i = 0; i < 256; ++i)
-            p[i] = cv::saturate_cast<uchar>(pow(i / 255.0, 0.5) * 255.0);
-        cv::LUT(input, lookUpTable, gc_image);
 
-        return gc_image;
-    };
-    auto saturation_thresholding = [](const cv::Mat& input) -> cv::Mat
-    {
-        // Variables
-        const unsigned int SATURATION_THRESHOLD = 30;
 
-        // Convert to HSV
-        cv::Mat hsv_image;
-        cv::cvtColor(input, hsv_image, cv::COLOR_BGR2HSV);
-        cv::Mat saturation;
-        cv::extractChannel(hsv_image, saturation, 1);
-
-        // Thresholding
-        cv::threshold(saturation, saturation, SATURATION_THRESHOLD, 255, cv::THRESH_BINARY);
-
-        return saturation;
-    };
-    auto niBlack_thresholding = [](const cv::Mat& input) -> cv::Mat
-    {
-        // Variables
-        const unsigned int NIBLACK_BLOCK_SIZE = 19;
-        const double NIBLACK_K = 0.7;
-
-        // Convert to grayscale
-        cv::Mat gray_image;
-        cv::cvtColor(input, gray_image, cv::COLOR_BGR2GRAY);
-
-        // Thresholding
-        cv::Mat niblack;
-        cv::ximgproc::niBlackThreshold(gray_image, niblack, 255, cv::THRESH_BINARY, NIBLACK_BLOCK_SIZE, NIBLACK_K, cv::ximgproc::BINARIZATION_NIBLACK);
-
-        return niblack;
-    };
-    auto fill_holes = [](cv::Mat& input) -> void
-    {
-        cv::Mat result = input.clone();
-
-        // Fill holes
-        cv::floodFill(result, cv::Point(0, 0), 255);
-        cv::Mat inversed;
-        cv::bitwise_not(result, inversed);
-        input = (input | inversed);
-    };
     cv::Mat image = roiInput.clone();
-    cv::Mat gc_image = gamma_correction(image);
+    cv::Mat gc_image = gamma_correction(image, GAMMA);
     cv::imshow("Gamma", gc_image);
     cv::waitKey(0);
-    cv::Mat saturation = saturation_thresholding(gc_image);
-    //cv::imshow("mongus", saturation);
-    //cv::waitKey(0);
-    cv::Mat niblack = niBlack_thresholding(image);
+    cv::Mat saturation = saturation_thresholding(image, SATURATION_THRESHOLD);
+    cv::imshow("Sat", saturation);
+    cv::waitKey(0);
+    cv::Mat niblack = niBlack_thresholding(image, NIBLACK_BLOCK_SIZE, NIBLACK_K);
     cv::imshow("NI", niblack);
     cv::waitKey(0);
 
-
+    /*
     cv::Mat mask = saturation & niblack;
     cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(CLOSE_KERNEL_SIZE, CLOSE_KERNEL_SIZE)));
     cv::dilate(mask, mask, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(DILATE_KERNEL_SIZE, DILATE_KERNEL_SIZE)));
@@ -155,20 +121,11 @@ BoundingBoxes::BoundingBoxes(const cv::Mat &input) {
     //cv::imshow("mongus", mask);
     //cv::waitKey(0);
 
-
-    cvtColor( roiInput, roiGray, COLOR_BGR2GRAY );
-
+    */
 
 
-
-
-
-
-
-
-
-
-    GaussianBlur(roiGray, roiGray, Size(kernelSize,kernelSize), 0);
+    cvtColor( roiInput, roiGray, cv::COLOR_BGR2GRAY );
+    GaussianBlur(roiGray, roiGray, cv::Size(kernelSize,kernelSize), 0);
     Canny( roiGray, roiCanny, lowThreshold, lowThreshold*ratio, kernelSize );
 
 
@@ -291,6 +248,7 @@ BoundingBoxes::BoundingBoxes(const cv::Mat &input) {
 
         // Draw the rotated bounding box
         for (int j = 0; j < 4; j++) {
+
             line(output, boxPoints[j], boxPoints[(j+1)%4], Scalar(255, 0, 0), 2);
         }
         cv::namedWindow("sugoma");

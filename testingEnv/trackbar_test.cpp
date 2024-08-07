@@ -5,12 +5,31 @@
 using namespace cv;
 using namespace std;
 
+
 //paste the method you want to test
-Mat niBlack_thresholding(const cv::Mat& input, const int& blockSize, const double& k) {
-    cv::Mat gray_image, niblack;
-    cv::cvtColor(input, gray_image, cv::COLOR_BGR2GRAY);
-    cv::ximgproc::niBlackThreshold(gray_image, niblack, 255, cv::THRESH_BINARY, blockSize, k, cv::ximgproc::BINARIZATION_NIBLACK);
-    return niblack;
+Mat niBlack_thresholding(const cv::Mat& input,int& thresh, int& minL, int& maxLGap ) {
+    cv::Mat sugoi, roiGray, roiCanny;
+
+    cvtColor(input, roiGray, cv::COLOR_BGR2GRAY);
+    GaussianBlur(roiGray, roiGray, cv::Size(5, 5), 0);
+    int blockSize = 5; // Size of the pixel neighborhood used to calculate the threshold
+    int C = 2;          // Constant subtracted from the mean or weighted mean
+    cv::adaptiveThreshold(roiGray, roiGray, 255, cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY, blockSize, C);
+    cv::bitwise_not(roiGray, roiGray);
+    cv::medianBlur(roiGray, sugoi, 3);
+    cvtColor(input, roiGray, cv::COLOR_BGR2GRAY);
+    GaussianBlur(roiGray, roiGray, cv::Size(5, 5), 0);
+    Canny(roiGray, roiCanny, 100, 100 * 22, 5);
+    cv::Mat mask = sugoi | roiCanny;
+
+
+    std::vector<cv::Vec4i> hough_lines;
+    cv::HoughLinesP(mask, hough_lines, 1, CV_PI / 180, thresh, minL, maxLGap);
+    cv::Mat hough_lines_image = input.clone();
+    for (auto l: hough_lines) {
+        cv::line(hough_lines_image, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]), cv::Scalar(0, 0, 255));
+    }
+    return hough_lines_image;
 }
 
 //struct with user defined parameters
@@ -22,10 +41,13 @@ typedef struct Params{
     Mat dest;
 
     //define variable min and max to be changed with trackbars
-    int blockSize = 3;
-    const int blockSizeMax = 1000;
-    int k = 0;
-    const int maxK = 50;
+    int thresh = 0;
+    const int threshMax = 80;
+
+    int minL = 0;
+    const int minLMax = 100;
+    int maxLGap = 0;
+    const int maxLGapMax = 60;
 } gParams;
 
 //preprocessing needed to create the ROIs making the environment similar to the main program
@@ -76,12 +98,18 @@ static void CallbackFunct(int, void* userdata){
     Params &params = *((Params*)userdata);
 
     //handles the odd-only parameters always adding 1 if the trackbar is set to an even value, comment if not needed
-    if (params.blockSize % 2 == 0) {
-        params.blockSize++;
+    if (params.thresh % 2 == 0) {
+        params.thresh++;
+    }
+    if (params.minL % 2 == 0) {
+        params.minL++;
+    }
+    if (params.maxLGap % 2 == 0) {
+        params.maxLGap++;
     }
 
     //call the function you want to test
-    params.dest = niBlack_thresholding(params.img, params.blockSize, static_cast<double>(params.k));
+    params.dest = niBlack_thresholding(params.img, params.thresh, params.minL, params.maxLGap);
 
 
     // Display the output image
@@ -105,7 +133,6 @@ int main(int argc, char** argv) {
     gParams userdata;
 
 
-
     for (const auto& iter : std::filesystem::directory_iterator(pathSequenceFramesDir)) {
         std::string imgPath = iter.path().string();
 
@@ -124,8 +151,9 @@ int main(int argc, char** argv) {
         namedWindow(imgPath, WINDOW_AUTOSIZE);
 
         //create all the trackbars with the relative parameters
-        createTrackbar( "Blocksize", imgPath, &userdata.blockSize, userdata.blockSizeMax, CallbackFunct, &userdata);
-        createTrackbar( "K", imgPath, &userdata.k, userdata.maxK, CallbackFunct, &userdata);
+        createTrackbar( "Thresh", imgPath, &userdata.thresh, userdata.threshMax, CallbackFunct, &userdata);
+        createTrackbar( "minLenght", imgPath, &userdata.minL, userdata.minLMax, CallbackFunct, &userdata);
+        createTrackbar( "maxGapLines", imgPath, &userdata.maxLGap, userdata.maxLGapMax, CallbackFunct, &userdata);
 
         CallbackFunct(0, &userdata);
 

@@ -29,9 +29,8 @@ int main(int argc, char** argv) {
         BoundingBoxes BBoxes = BoundingBoxes(inputImg);
 
         cv::Mat test = BBoxes.getImg();
-        //cv::namedWindow("mongus", cv::WINDOW_AUTOSIZE);
-        //cv::imshow("mongus", test);
-        //cv::waitKey(0);
+        cv::imshow("mongus", test);
+        cv::waitKey(0);
     }
     return 0;
 }

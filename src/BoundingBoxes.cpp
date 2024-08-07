@@ -112,7 +112,7 @@ BoundingBoxes::BoundingBoxes(const cv::Mat &input) {
     threshold(highPass, otsuThresh, 0, 255, cv::THRESH_BINARY + cv::THRESH_OTSU);
     //cv::imshow("otsu thresh", otsuThresh);
     //cv::waitKey(0);
-    cv::medianBlur(otsuThresh, otsuThresh, 3);
+    //cv::medianBlur(otsuThresh, otsuThresh, 3);
     //cv::imshow("otsu thresh AFTER", otsuThresh);
     //cv::waitKey(0);
 
@@ -149,15 +149,39 @@ BoundingBoxes::BoundingBoxes(const cv::Mat &input) {
     Canny( roiGray, roiCanny, lowThreshold, lowThreshold*ratio, kernelSize );
     //cv::imshow("Canny", roiCanny);
     //cv::waitKey(0);
+
+
     cv::Mat mask = sugoi | roiCanny;
-    cv::morphologyEx(mask, mask, cv::MORPH_ERODE, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3)));
+    //cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3)));
     cv::imshow("Final mask", mask);
     cv::waitKey(0);
 
+    /*
+    // CORNER DETECTION
+    std::vector<cv::Point2f> corners;
+    int maxCorners = 100;
+    double qualityLevel = 0.01;
+    double minDistance = 10.0;
+    cv::goodFeaturesToTrack(roiCanny, corners, maxCorners, qualityLevel, minDistance);
+    // Parameters for corner refinement
+    cv::Size winSize = cv::Size(5, 5);
+    cv::Size zeroZone = cv::Size(-1, -1);
+    cv::TermCriteria criteria = cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::MAX_ITER, 30, 0.001);
+    // Refine corners to sub-pixel accuracy
+    cv::cornerSubPix(roiCanny, corners, winSize, zeroZone, criteria);
+    // Draw the corners
+    cv::Mat corn = input.clone();
+    for (size_t i = 0; i < corners.size(); i++)
+    {
+        cv::circle(corn, corners[i], 3, cv::Scalar(0, 255, 0), cv::FILLED);
+    }
+    cv::imshow("Corn", corn);
+    cv::waitKey(0);
+    */
 
     // Hough Transform
     std::vector<cv::Vec4i> hough_lines;
-    cv::HoughLinesP(mask, hough_lines, 1, CV_PI /180, 50, 30, 10);
+    cv::HoughLinesP(mask, hough_lines, 1, CV_PI /180, 40, 25, 4);
     cv::Mat hough_lines_image = input.clone();
     for (auto l : hough_lines) {
         cv::line(hough_lines_image, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]), cv::Scalar(0,0, 255));

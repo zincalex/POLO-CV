@@ -14,14 +14,17 @@ cv::Mat BoundingBoxes::createROI(const cv::Mat& input) { // We focus the analysi
 
     // Define ROIs
     std::vector<cv::RotatedRect> rois;
-    rois.push_back(cv::RotatedRect(cv::Point2f(572, 317), cv::Size2f(771, 282), 58));
-    rois.push_back(cv::RotatedRect(cv::Point2f(950, 200), cv::Size2f(165, 710), -54));
-    rois.push_back(cv::RotatedRect(cv::Point2f(1136, 105), cv::Size2f(73, 467), 118));
+    rois.push_back(cv::RotatedRect(cv::Point2f(580, 317), cv::Size2f(771, 282), 58));
+    rois.push_back(cv::RotatedRect(cv::Point2f(950, 192), cv::Size2f(165, 710), 128));
+    rois.push_back(cv::RotatedRect(cv::Point2f(1084, 83), cv::Size2f(452, 54), 28));
+    //rois.push_back(cv::RotatedRect(cv::Point2f(950, 200), cv::Size2f(165, 710), -54));
+    //rois.push_back(cv::RotatedRect(cv::Point2f(1136, 105), cv::Size2f(73, 467), 118));
 
     std::vector<cv::RotatedRect> black_rois;        // More ad hoc ROI in order to refine the ROI selected
-    black_rois.push_back(cv::RotatedRect(cv::Point2f(799, 343), cv::Size2f(1227, 125), 46));
-    black_rois.push_back(cv::RotatedRect(cv::Point2f(326, 3), cv::Size2f(62, 113), 50));
-    black_rois.push_back(cv::RotatedRect(cv::Point2f(861, 25), cv::Size2f(552, 64), 33));
+    black_rois.push_back(cv::RotatedRect(cv::Point2f(777, 343), cv::Size2f(1227, 125), 47));
+    //black_rois.push_back(cv::RotatedRect(cv::Point2f(326, 3), cv::Size2f(62, 113), 50));  Parking lot high left
+    //black_rois.push_back(cv::RotatedRect(cv::Point2f(861, 25), cv::Size2f(552, 64), 33)); Old measures
+    black_rois.push_back(cv::RotatedRect(cv::Point2f(861, 30), cv::Size2f(1042, 72), 32));
 
     for (const auto& roiRect : rois) {
         cv::Point2f vertices[4];
@@ -79,14 +82,41 @@ cv::Mat BoundingBoxes::saturation_thresholding(const cv::Mat& input, const unsig
 }
 
 
+cv::Mat minFilter(const cv::Mat& src, const int& kernel_size) {
+    // Controls
+    if(kernel_size % 2 == 0) throw std::invalid_argument("Error: kernel_size must be odd");
+    if(src.channels() != 1) throw std::invalid_argument("Error: the image provided must have only one channel");
+
+    cv::Mat out(src.rows, src.cols, CV_8U);
+    for(int i = 0; i < src.rows; i++) {
+        for(int j = 0; j < src.cols; j++) {
+            int min = 255;
+            int temp;
+            for(int x = -kernel_size/2; x <= kernel_size/2; x++) {
+                for(int y = -kernel_size/2; y <= kernel_size/2; y++) {
+                    if((i+x) >= 0 && (j+y) >= 0 && (i+x) < src.rows && (j+y) < src.cols) { // in case the kernel exceeds the image size
+                        temp = src.at<unsigned char> (i+x, j+y);
+                        if(temp < min)
+                            min = temp;
+                    }
+                }
+            }
+
+            for(int x = -kernel_size/2; x <= kernel_size/2; x++)
+                for(int y = -kernel_size/2; y <= kernel_size/2; y++)
+                    if((i+x) >= 0 && (j+y) >= 0 && (i+x) < src.rows && (j+y) < src.cols)
+                        out.at<unsigned char> (i+x, j+y) = min;
+        }
+    }
+    return out;
+}
+
 BoundingBoxes::BoundingBoxes(const cv::Mat &input) {
     int kernelSize = 5;
     int lowThreshold = 100;
     int ratio = 22;
     double GAMMA = 2.5;
-    const unsigned int NIBLACK_BLOCK_SIZE = 19;
-    const double NIBLACK_K = 0.7;
-    const unsigned int SATURATION_THRESHOLD = 100;         // 30
+    const unsigned int SATURATION_THRESHOLD = 200;
     cv::Mat roiGray, roiCanny;
 
     // Image Preprocessing
@@ -119,11 +149,8 @@ BoundingBoxes::BoundingBoxes(const cv::Mat &input) {
 
     // TODO THIS sequence is real good
     cv::Mat sugoi;
-
     cvtColor( roiInput, roiGray, cv::COLOR_BGR2GRAY );
     GaussianBlur(roiGray, roiGray, cv::Size(5,5), 0);
-    //cv::imshow("gray", roiGray);
-    //cv::waitKey(0);
     int blockSize = 5; // Size of the pixel neighborhood used to calculate the threshold
     int C = 2;          // Constant subtracted from the mean or weighted mean
     cv::adaptiveThreshold(roiGray, roiGray, 255, cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY, blockSize, C);
@@ -139,7 +166,9 @@ BoundingBoxes::BoundingBoxes(const cv::Mat &input) {
     cv::Mat saturation = saturation_thresholding(gc_image, SATURATION_THRESHOLD);
     //cv::imshow("Sat", saturation);
     //cv::waitKey(0);
-    cv::Mat niblack = niBlack_thresholding(image, NIBLACK_BLOCK_SIZE, NIBLACK_K);
+    const unsigned int NIBLACK_BLOCK_SIZE = 7;
+    const double NIBLACK_K = 0.6;
+    cv::Mat niblack = niBlack_thresholding(gc_image, NIBLACK_BLOCK_SIZE, NIBLACK_K);
     //cv::imshow("NI", niblack);
     //cv::waitKey(0);
 
@@ -151,84 +180,135 @@ BoundingBoxes::BoundingBoxes(const cv::Mat &input) {
     //cv::waitKey(0);
 
 
-    cv::Mat mask = sugoi | roiCanny;
-    //cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3)));
+    cv::Mat mask =  sugoi | roiCanny | otsuThresh | saturation;
+    //cv::morphologyEx(mask, mask, cv::MORPH_OPEN, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3)));
+    //cv::imshow("After op mask", mask);
+    //cv::waitKey(0);
+    cv::medianBlur(mask, mask, 3);
+    //cv::imshow("After median mask", mask);
+    //cv::waitKey(0);
+    cv::morphologyEx(mask, mask, cv::MORPH_ERODE, cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(3, 3)));
+    //cv::morphologyEx(mask, mask, cv::MORPH_DILATE, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3)));
+    //cv::imshow("After dialte mask", mask);
+    //cv::waitKey(0);
+
+
+    // CONVERSTION TO WHITE BLACK
+    cv::bitwise_not(mask, mask);
+    cvtColor(mask, mask, cv::COLOR_GRAY2BGR);
+    mask = createROI(mask);
+    cvtColor(mask, mask, cv::COLOR_BGR2GRAY);
+
     cv::imshow("Final mask", mask);
     cv::waitKey(0);
+    mask = minFilter(mask, 7);
+    //cv::imshow("After min mask", mask);
+    //cv::waitKey(0);
+    img = mask;
+
 
     /*
     // CORNER DETECTION
     std::vector<cv::Point2f> corners;
     int maxCorners = 100;
     double qualityLevel = 0.01;
-    double minDistance = 10.0;
-    cv::goodFeaturesToTrack(roiCanny, corners, maxCorners, qualityLevel, minDistance);
+    double minDistance = 0.5;
+
+    cv::Mat postM;
+    cv::preCornerDetect(mask, postM, 3);
+    cv::imshow("Pre C detect", postM);
+    cv::waitKey(0);
+
+    cv::Mat inputMasked = mask & input;
+    cvtColor(inputMasked, inputMasked, cv::COLOR_BGR2GRAY);
+    cv::imshow("input masked", inputMasked);
+    cv::waitKey(0);
+    cv::goodFeaturesToTrack(inputMasked, corners, maxCorners, qualityLevel, minDistance);
     // Parameters for corner refinement
-    cv::Size winSize = cv::Size(5, 5);
-    cv::Size zeroZone = cv::Size(-1, -1);
-    cv::TermCriteria criteria = cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::MAX_ITER, 30, 0.001);
+    //cv::Size winSize = cv::Size(5, 5);
+    //cv::Size zeroZone = cv::Size(-1, -1);
+    //cv::TermCriteria criteria = cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::MAX_ITER, 30, 0.001);
     // Refine corners to sub-pixel accuracy
-    cv::cornerSubPix(roiCanny, corners, winSize, zeroZone, criteria);
+    //cv::cornerSubPix(inputMasked, corners, winSize, zeroZone, criteria);
     // Draw the corners
     cv::Mat corn = input.clone();
-    for (size_t i = 0; i < corners.size(); i++)
-    {
+    for (size_t i = 0; i < corners.size(); i++) {
         cv::circle(corn, corners[i], 3, cv::Scalar(0, 255, 0), cv::FILLED);
     }
     cv::imshow("Corn", corn);
     cv::waitKey(0);
     */
 
+
+    /*
     // Hough Transform
     std::vector<cv::Vec4i> hough_lines;
     cv::HoughLinesP(mask, hough_lines, 1, CV_PI /180, 40, 25, 4);
-    cv::Mat hough_lines_image = input.clone();
+
     for (auto l : hough_lines) {
         cv::line(hough_lines_image, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]), cv::Scalar(0,0, 255));
     }
-
-    img = hough_lines_image;
-
+    */
 
     // Other hough
+
+
+
+    // Close lines that have almost same slope can be removed by using lower angle resolutions for the theta argument of Hough Line method. For example using π/180
+    // would result in finding lines that differ only by one degree in their slope. You may use 5*π/180 to find lines in 5 degree resolution.
+
+
+
+    // DRAW LINES
     /*
-    // Draw lines from lines1
-    std::vector<cv::Vec2f> lines1;
-    std::vector<cv::Vec2f> lines2;
-    cv::HoughLines(roiCanny, lines1, 1, CV_PI/180, 75, 0, 0, CV_PI / 3, CV_PI / 2);
-    cv::HoughLines(roiCanny, lines2, 1, CV_PI/180, 100, 0, 0, -CV_PI / 9, - CV_PI / 18);
-    cv::Mat clone = input.clone();
-    for (size_t i = 0; i < lines1.size(); i++) {
-        float rho = lines1[i][0], theta = lines1[i][1];
+    std::vector<cv::Vec2f> linesDown;
+    cv::HoughLines(mask, linesDown, 5, 5 * CV_PI/180, 150, 0, 0, -5* CV_PI / 12, -  7 * CV_PI / 18);
+    cv::Mat hough_lines_image = mask.clone();
+    cv::cvtColor(mask, hough_lines_image, cv::COLOR_GRAY2BGR);
+    for (size_t i = 0; i < linesDown.size(); i++) {
+        float rho = linesDown[i][0], theta = linesDown[i][1];
         double a = cos(theta), b = sin(theta);
-        double x0 = a * rho, y0 = b * rho;
-
-
-        double length = 200;
+        double x0 = a * rho, y0 = b * rho ;
+        double length = 1500;
         cv::Point pt1(cvRound(x0 + length * (-b)), cvRound(y0 + length * (a)));
         cv::Point pt2(cvRound(x0 - length * (-b)), cvRound(y0 - length * (a)));
-        cv::line(clone, pt1, pt2, cv::Scalar(0, 0, 255), 1, cv::LINE_AA); // Red color for lines1
+        cv::line(hough_lines_image, pt1, pt2, cv::Scalar(255, 0, 255), 1, cv::LINE_AA);
     }
 
-    // Draw lines from lines2
-    for (size_t i = 0; i < lines2.size(); i++) {
-        float rho = lines2[i][0], theta = lines2[i][1];
+
+    /*
+    std::vector<cv::Vec2f> linesUp;
+    // 55 -- 65 --- 86 the angles
+    cv::HoughLines(mask, linesUp, 5, 5 * CV_PI/180, 300, 0, 0,  5* CV_PI / 18,   87* CV_PI / 180);
+    cv::Mat hough_lines_image = mask.clone();
+    cv::cvtColor(mask, hough_lines_image, cv::COLOR_GRAY2BGR);
+    for (size_t i = 0; i < linesUp.size(); i++) {
+        float rho = linesUp[i][0], theta = linesUp[i][1];
         double a = cos(theta), b = sin(theta);
-        double x0 = a * rho, y0 = b * rho;
-        cv::Point pt1(cvRound(x0 + 1000 * (-b)), cvRound(y0 + 1000 * (a)));
-        cv::Point pt2(cvRound(x0 - 1000 * (-b)), cvRound(y0 - 1000 * (a)));
-        cv::line(clone, pt1, pt2, cv::Scalar(255, 0, 0), 2, cv::LINE_AA); // Blue color for lines2
+        double x0 = a * rho, y0 = b * rho ;
+        double length = 1500;
+        cv::Point pt1(cvRound(x0 + length * (-b)), cvRound(y0 + length * (a)));
+        cv::Point pt2(cvRound(x0 - length * (-b)), cvRound(y0 - length * (a)));
+        cv::line(hough_lines_image, pt1, pt2, cv::Scalar(255, 0, 255), 1, cv::LINE_AA); // Blue color for lines2
     }
-
     */
 
 
-
-
-    /*
     std::vector<std::vector<cv::Point>> contours;
-    cv::findContours(hough_lines_image, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
-
+    std::vector<cv::Vec4i> hierarchy;
+    cv::findContours(mask, contours, hierarchy, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
+    cv::Mat out = input.clone();
+    // iterate through all the top-level contours,
+    // draw each connected component with its own random color
+    int idx = 0;
+    for( ; idx >= 0; idx = hierarchy[idx][0] )
+    {
+        cv::Scalar color( rand()&255, rand()&255, rand()&255 );
+        drawContours( out, contours, idx, color, cv::FILLED, 8, hierarchy );
+    }
+    cv::imshow("Test", out);
+    cv::waitKey(0);
+    /*
     cv::Mat output = img.clone();
     for (size_t i = 0; i < contours.size(); i++) {
         cv::RotatedRect rect = minAreaRect(contours[i]);
@@ -277,7 +357,8 @@ BoundingBoxes::BoundingBoxes(const cv::Mat &input) {
         cv::namedWindow("sugoma");
         cv::imshow("sugoma", output);
     }
-    */
+     */
+
 }
 
 

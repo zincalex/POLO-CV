@@ -11,6 +11,6 @@ add_library(BBox
 )
 
 add_executable(${PROJECT_NAME}
-        trackbar_test.cpp)
+        main.cpp)
 
 target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS} BBox)

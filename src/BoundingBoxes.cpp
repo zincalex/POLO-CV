@@ -81,7 +81,6 @@ cv::Mat BoundingBoxes::saturation_thresholding(const cv::Mat& input, const unsig
     return saturation;
 }
 
-
 cv::Mat minFilter(const cv::Mat& src, const int& kernel_size) {
     // Controls
     if(kernel_size % 2 == 0) throw std::invalid_argument("Error: kernel_size must be odd");
@@ -130,7 +129,8 @@ BoundingBoxes::BoundingBoxes(const cv::Mat &input) {
     cvtColor(image, gray, cv::COLOR_BGR2GRAY);
     cv::Mat blurred;
     int radius = 3;
-    int kernel = 2 * radius + 1;
+    int kernel = 9;
+    //int kernel = 2 * radius + 1;
     GaussianBlur(gray, blurred, cv::Size(kernel, kernel), 0);
     // Subtract the blurred image from the original image
     cv::Mat highPass;
@@ -166,9 +166,10 @@ BoundingBoxes::BoundingBoxes(const cv::Mat &input) {
     cv::Mat saturation = saturation_thresholding(gc_image, SATURATION_THRESHOLD);
     //cv::imshow("Sat", saturation);
     //cv::waitKey(0);
-    const unsigned int NIBLACK_BLOCK_SIZE = 7;
-    const double NIBLACK_K = 0.6;
-    cv::Mat niblack = niBlack_thresholding(gc_image, NIBLACK_BLOCK_SIZE, NIBLACK_K);
+
+    const unsigned int NIBLACK_BLOCK_SIZE = 9;
+    const double NIBLACK_K = 0.9;
+    cv::Mat niblack = niBlack_thresholding(roiInput, NIBLACK_BLOCK_SIZE, NIBLACK_K);
     //cv::imshow("NI", niblack);
     //cv::waitKey(0);
 
@@ -182,12 +183,12 @@ BoundingBoxes::BoundingBoxes(const cv::Mat &input) {
 
     cv::Mat mask =  sugoi | roiCanny | otsuThresh | saturation;
     //cv::morphologyEx(mask, mask, cv::MORPH_OPEN, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3)));
-    //cv::imshow("After op mask", mask);
+    //cv::imshow("Union masks", mask);
     //cv::waitKey(0);
-    cv::medianBlur(mask, mask, 3);
+   //cv::medianBlur(mask, mask, 3);
     //cv::imshow("After median mask", mask);
     //cv::waitKey(0);
-    cv::morphologyEx(mask, mask, cv::MORPH_ERODE, cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(3, 3)));
+    cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(3, 3)));
     //cv::morphologyEx(mask, mask, cv::MORPH_DILATE, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3)));
     //cv::imshow("After dialte mask", mask);
     //cv::waitKey(0);
@@ -199,11 +200,11 @@ BoundingBoxes::BoundingBoxes(const cv::Mat &input) {
     mask = createROI(mask);
     cvtColor(mask, mask, cv::COLOR_BGR2GRAY);
 
-    cv::imshow("Final mask", mask);
-    cv::waitKey(0);
-    mask = minFilter(mask, 7);
-    //cv::imshow("After min mask", mask);
+    //cv::imshow("Final mask", mask);
     //cv::waitKey(0);
+    mask = minFilter(mask, 5);
+    cv::imshow("After min mask", mask);
+    cv::waitKey(0);
     img = mask;
 
 
@@ -308,56 +309,50 @@ BoundingBoxes::BoundingBoxes(const cv::Mat &input) {
     }
     cv::imshow("Test", out);
     cv::waitKey(0);
-    /*
-    cv::Mat output = img.clone();
-    for (size_t i = 0; i < contours.size(); i++) {
-        cv::RotatedRect rect = minAreaRect(contours[i]);
 
-        // Ensure width and height are valid
-        float minDim = std::min(rect.size.width, rect.size.height);
-        float maxDim = std::max(rect.size.width, rect.size.height);
-        if (minDim > 20 || maxDim / minDim < 2) {
-            continue;
+
+
+    cv::Mat out2 = input.clone();
+    // Iterate through all the top-level contours
+    int contourNumber = 1;
+    int fontFace = cv::FONT_HERSHEY_SIMPLEX;
+    double fontScale = 0.5;
+    int thickness = 2;
+    for(int idx = 0; idx >= 0; idx = hierarchy[idx][0]) {
+        // Get the bounding box for each contour
+        cv::Rect boundingBox = cv::boundingRect(contours[idx]);
+
+        // Draw the bounding box on the output image
+        if(boundingBox.height > 18 && boundingBox.width > 18 && boundingBox.height < 200 && boundingBox.width < 200) {
+            // Draw rectangle
+            cv::rectangle(out2, boundingBox.tl(), boundingBox.br(), cv::Scalar(255, 0, 0), 2);
+
+            cv::Point center = (boundingBox.tl() + boundingBox.br()) * 0.5;
+            // Get the size of the text box
+            int baseline = 0;
+            std::string text = std::to_string(contourNumber);
+            cv::Size textSize = cv::getTextSize(text, fontFace, fontScale, thickness, &baseline);
+            cv::Point textOrigin(center.x - textSize.width / 2, center.y + textSize.height / 2);
+
+            cv::putText(out2, text, textOrigin, fontFace, fontScale, cv::Scalar(255, 0, 255), thickness);
+            contourNumber++;
         }
 
-        // Check if the average grayscale value is greater than 115
-        double avgGrayscale = computeAverageGrayscale(input_gray, rect);
-        if (avgGrayscale <= 115) {
-            continue;
-        }
+        /*
+        // PRINT THE CONTOURS OF A BBOX
+        std::vector<cv::Point> boundingBoxPoints;
+        boundingBoxPoints.push_back(boundingBox.tl()); // Top-left
+        boundingBoxPoints.push_back(cv::Point(boundingBox.x + boundingBox.width, boundingBox.y)); // Top-right
+        boundingBoxPoints.push_back(cv::Point(boundingBox.x, boundingBox.y + boundingBox.height)); // Bottom-left
+        boundingBoxPoints.push_back(boundingBox.br()); // Bottom-right
 
-        // Draw the rectangle if all conditions are met
-        cv::Point2f vertices[4];
-        rect.points(vertices);
+        for (const auto& point : boundingBoxPoints)
+            std::cout << "Point: " << point << std::endl;
+        */
 
-        // Debug output to check vertex values and thickness
-        cout << "Drawing rectangle with vertices: ";
-        for (int j = 0; j < 4; j++) {
-            cout << "(" << vertices[j].x << ", " << vertices[j].y << ") ";
-        }
-        cout << endl;
-
-        // Draw lines between the vertices
-        for (int j = 0; j < 4; j++) {
-            line(output, vertices[j], vertices[(j+1)%4], Scalar(0, 255, 0), 2);
-        }
-
-        // Create rotated bounding boxes that touch two of these lines
-        // Choose two adjacent vertices to form a rotated bounding box
-        Point2f boxPoints[4];
-        for (int j = 0; j < 4; j++) {
-            boxPoints[j] = vertices[j];
-        }
-
-        // Draw the rotated bounding box
-        for (int j = 0; j < 4; j++) {
-
-            line(output, boxPoints[j], boxPoints[(j+1)%4], Scalar(255, 0, 0), 2);
-        }
-        cv::namedWindow("sugoma");
-        cv::imshow("sugoma", output);
     }
-     */
+    cv::imshow("Sbu", out2);
+    cv::waitKey(0);
 
 }
 

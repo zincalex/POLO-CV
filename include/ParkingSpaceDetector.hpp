@@ -1,15 +1,16 @@
-#ifndef BOUNDINGBOXES_HPP
-#define BOUNDINGBOXES_HPP
+#ifndef PARKINGSPACEDETECTION_HPP
+#define PARKINGSPACEDETECTION_HPP
 
 #include <vector>
 #include <iostream>
+#include <filesystem>
 #include <opencv2/imgproc.hpp>
 #include <opencv4/opencv2/highgui.hpp>
 #include <opencv2/ximgproc.hpp>
 
-class BoundingBoxes {
+class ParkingSpaceDetection {
 public:
-    BoundingBoxes(const cv::Mat& input);
+    ParkingSpaceDetection(const std::filesystem::path& emptyFramesDir);
 
     cv::Mat getImg() {return img;}
 

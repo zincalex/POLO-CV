@@ -1,4 +1,4 @@
-#include "../include/BoundingBoxes.hpp"
+#include "../include/ParkingSpaceDetection.hpp"
 
 
 const unsigned int CLOSE_KERNEL_SIZE = 9;
@@ -8,7 +8,7 @@ const unsigned int MAX_AREA_THRESHOLD = 60000;
 const unsigned int CIRCLE_NEIGHBORHOOD = 5;
 
 
-cv::Mat BoundingBoxes::createROI(const cv::Mat& input) { // We focus the analysis of the image on the parking lots
+cv::Mat ParkingSpaceDetection::createROI(const cv::Mat& input) { // We focus the analysis of the image on the parking lots
     cv::Mat mask = cv::Mat::zeros(input.size(), CV_8UC1);
     cv::Mat result = cv::Mat::zeros(input.size(), input.type());
 
@@ -51,7 +51,7 @@ cv::Mat BoundingBoxes::createROI(const cv::Mat& input) { // We focus the analysi
     return result;
 }
 
-cv::Mat BoundingBoxes::gamma_correction(const cv::Mat& input, const double& gamma) {
+cv::Mat ParkingSpaceDetection::gamma_correction(const cv::Mat& input, const double& gamma) {
     cv::Mat img_float, img_gamma;
 
     input.convertTo(img_float, CV_32F, 1.0 / 255.0);    // Convert to float and scale to [0, 1]
@@ -62,14 +62,14 @@ cv::Mat BoundingBoxes::gamma_correction(const cv::Mat& input, const double& gamm
     return img_gamma;
 }
 
-cv::Mat BoundingBoxes::niBlack_thresholding(const cv::Mat& input, const int& blockSize, const double& k) {
+cv::Mat ParkingSpaceDetection::niBlack_thresholding(const cv::Mat& input, const int& blockSize, const double& k) {
     cv::Mat gray_image, niblack;
     cv::cvtColor(input, gray_image, cv::COLOR_BGR2GRAY);
     cv::ximgproc::niBlackThreshold(gray_image, niblack, 255, cv::THRESH_BINARY, blockSize, k, cv::ximgproc::BINARIZATION_NIBLACK);
     return niblack;
 }
 
-cv::Mat BoundingBoxes::saturation_thresholding(const cv::Mat& input, const unsigned int& satThreshold) {
+cv::Mat ParkingSpaceDetection::saturation_thresholding(const cv::Mat& input, const unsigned int& satThreshold) {
     cv::Mat hsv_image, saturation;
 
     cv::cvtColor(input, hsv_image, cv::COLOR_BGR2HSV);
@@ -110,102 +110,119 @@ cv::Mat minFilter(const cv::Mat& src, const int& kernel_size) {
     return out;
 }
 
-BoundingBoxes::BoundingBoxes(const cv::Mat &input) {
-    int kernelSize = 5;
-    int lowThreshold = 100;
-    int ratio = 22;
-    double GAMMA = 2.5;
-    const unsigned int SATURATION_THRESHOLD = 200;
-    cv::Mat roiGray, roiCanny;
+ParkingSpaceDetection::ParkingSpaceDetection(const std::filesystem::path& emptyFramesDir) {
 
-    // Image Preprocessing
-    cv::Mat roiInput = createROI(input);        // Focus on the parking lots, my ROI
+    for (const auto& iter : std::filesystem::directory_iterator(emptyFramesDir) {
+        std::string imgPath = iter.path().string();
 
-    // TODO might consider something with HSV, dont know yet
-    cv::Mat image = roiInput.clone();
+        // Load the image
+        cv::Mat input = cv::imread(imgPath);
+        if (input.empty()) {
+            std::cout << "Error opening the image" << std::endl;
+            return -1;
+        }
 
-    // TODO new sequence (GOOD BUT gne)
-    cv::Mat gray;
-    cvtColor(image, gray, cv::COLOR_BGR2GRAY);
-    cv::Mat blurred;
-    int radius = 3;
-    int kernel = 9;
-    //int kernel = 2 * radius + 1;
-    GaussianBlur(gray, blurred, cv::Size(kernel, kernel), 0);
-    // Subtract the blurred image from the original image
-    cv::Mat highPass;
-    subtract(gray, blurred, highPass);
-    highPass = highPass + 128;
-    //cv::imshow("high", highPass);
-    //cv::waitKey(0);
-    cv::Mat otsuThresh;
-    threshold(highPass, otsuThresh, 0, 255, cv::THRESH_BINARY + cv::THRESH_OTSU);
-    //cv::imshow("otsu thresh", otsuThresh);
-    //cv::waitKey(0);
-    //cv::medianBlur(otsuThresh, otsuThresh, 3);
-    //cv::imshow("otsu thresh AFTER", otsuThresh);
-    //cv::waitKey(0);
+        int kernelSize = 5;
+        int lowThreshold = 100;
+        int ratio = 22;
+        double GAMMA = 2.5;
+        const unsigned int SATURATION_THRESHOLD = 200;
+        cv::Mat roiGray, roiCanny;
 
+        // Image Preprocessing
+        cv::Mat roiInput = createROI(input);        // Focus on the parking lots, my ROI
 
-    // TODO THIS sequence is real good
-    cv::Mat sugoi;
-    cvtColor( roiInput, roiGray, cv::COLOR_BGR2GRAY );
-    GaussianBlur(roiGray, roiGray, cv::Size(5,5), 0);
-    int blockSize = 5; // Size of the pixel neighborhood used to calculate the threshold
-    int C = 2;          // Constant subtracted from the mean or weighted mean
-    cv::adaptiveThreshold(roiGray, roiGray, 255, cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY, blockSize, C);
-    cv::bitwise_not(roiGray, roiGray);
-    cv::medianBlur(roiGray, sugoi, 3);
-    //cv::imshow("adaptive", sugoi);
-    //cv::waitKey(0);
+        // TODO might consider something with HSV, dont know yet
+        cv::Mat image = roiInput.clone();
+
+        // TODO new sequence (GOOD BUT gne)
+        cv::Mat gray;
+        cvtColor(image, gray, cv::COLOR_BGR2GRAY);
+        cv::Mat blurred;
+        int radius = 3;
+        int kernel = 9;
+        //int kernel = 2 * radius + 1;
+        GaussianBlur(gray, blurred, cv::Size(kernel, kernel), 0);
+        // Subtract the blurred image from the original image
+        cv::Mat highPass;
+        subtract(gray, blurred, highPass);
+        highPass = highPass + 128;
+        //cv::imshow("high", highPass);
+        //cv::waitKey(0);
+        cv::Mat otsuThresh;
+        threshold(highPass, otsuThresh, 0, 255, cv::THRESH_BINARY + cv::THRESH_OTSU);
+        //cv::imshow("otsu thresh", otsuThresh);
+        //cv::waitKey(0);
+        //cv::medianBlur(otsuThresh, otsuThresh, 3);
+        //cv::imshow("otsu thresh AFTER", otsuThresh);
+        //cv::waitKey(0);
 
 
-    cv::Mat gc_image = gamma_correction(image, GAMMA);
-    //cv::imshow("Gamma", gc_image);
-    //cv::waitKey(0);
-    cv::Mat saturation = saturation_thresholding(gc_image, SATURATION_THRESHOLD);
-    //cv::imshow("Sat", saturation);
-    //cv::waitKey(0);
-
-    const unsigned int NIBLACK_BLOCK_SIZE = 9;
-    const double NIBLACK_K = 0.9;
-    cv::Mat niblack = niBlack_thresholding(roiInput, NIBLACK_BLOCK_SIZE, NIBLACK_K);
-    //cv::imshow("NI", niblack);
-    //cv::waitKey(0);
-
-
-    cvtColor( roiInput, roiGray, cv::COLOR_BGR2GRAY );
-    GaussianBlur(roiGray, roiGray, cv::Size(kernelSize,kernelSize), 0);
-    Canny( roiGray, roiCanny, lowThreshold, lowThreshold*ratio, kernelSize );
-    //cv::imshow("Canny", roiCanny);
-    //cv::waitKey(0);
+        // TODO THIS sequence is real good
+        cv::Mat sugoi;
+        cvtColor( roiInput, roiGray, cv::COLOR_BGR2GRAY );
+        GaussianBlur(roiGray, roiGray, cv::Size(5,5), 0);
+        int blockSize = 5; // Size of the pixel neighborhood used to calculate the threshold
+        int C = 2;          // Constant subtracted from the mean or weighted mean
+        cv::adaptiveThreshold(roiGray, roiGray, 255, cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY, blockSize, C);
+        cv::bitwise_not(roiGray, roiGray);
+        cv::medianBlur(roiGray, sugoi, 3);
+        //cv::imshow("adaptive", sugoi);
+        //cv::waitKey(0);
 
 
-    cv::Mat mask =  sugoi | roiCanny | otsuThresh | saturation;
-    //cv::morphologyEx(mask, mask, cv::MORPH_OPEN, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3)));
-    //cv::imshow("Union masks", mask);
-    //cv::waitKey(0);
-   //cv::medianBlur(mask, mask, 3);
-    //cv::imshow("After median mask", mask);
-    //cv::waitKey(0);
-    cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(3, 3)));
-    //cv::morphologyEx(mask, mask, cv::MORPH_DILATE, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3)));
-    //cv::imshow("After dialte mask", mask);
-    //cv::waitKey(0);
+        cv::Mat gc_image = gamma_correction(image, GAMMA);
+        //cv::imshow("Gamma", gc_image);
+        //cv::waitKey(0);
+        cv::Mat saturation = saturation_thresholding(gc_image, SATURATION_THRESHOLD);
+        //cv::imshow("Sat", saturation);
+        //cv::waitKey(0);
+
+        const unsigned int NIBLACK_BLOCK_SIZE = 9;
+        const double NIBLACK_K = 0.9;
+        cv::Mat niblack = niBlack_thresholding(roiInput, NIBLACK_BLOCK_SIZE, NIBLACK_K);
+        //cv::imshow("NI", niblack);
+        //cv::waitKey(0);
 
 
-    // CONVERSTION TO WHITE BLACK
-    cv::bitwise_not(mask, mask);
-    cvtColor(mask, mask, cv::COLOR_GRAY2BGR);
-    mask = createROI(mask);
-    cvtColor(mask, mask, cv::COLOR_BGR2GRAY);
+        cvtColor( roiInput, roiGray, cv::COLOR_BGR2GRAY );
+        GaussianBlur(roiGray, roiGray, cv::Size(kernelSize,kernelSize), 0);
+        Canny( roiGray, roiCanny, lowThreshold, lowThreshold*ratio, kernelSize );
+        //cv::imshow("Canny", roiCanny);
+        //cv::waitKey(0);
 
-    //cv::imshow("Final mask", mask);
-    //cv::waitKey(0);
-    mask = minFilter(mask, 5);
-    cv::imshow("After min mask", mask);
-    cv::waitKey(0);
-    img = mask;
+
+        cv::Mat mask =  sugoi | roiCanny | otsuThresh | saturation;
+        //cv::morphologyEx(mask, mask, cv::MORPH_OPEN, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3)));
+        //cv::imshow("Union masks", mask);
+        //cv::waitKey(0);
+        //cv::medianBlur(mask, mask, 3);
+        //cv::imshow("After median mask", mask);
+        //cv::waitKey(0);
+        cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(3, 3)));
+        //cv::morphologyEx(mask, mask, cv::MORPH_DILATE, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3)));
+        //cv::imshow("After dialte mask", mask);
+        //cv::waitKey(0);
+
+
+        // CONVERSTION TO WHITE BLACK
+        cv::bitwise_not(mask, mask);
+        cvtColor(mask, mask, cv::COLOR_GRAY2BGR);
+        mask = createROI(mask);
+        cvtColor(mask, mask, cv::COLOR_BGR2GRAY);
+
+        //cv::imshow("Final mask", mask);
+        //cv::waitKey(0);
+        mask = minFilter(mask, 5);
+        //cv::imshow("After min mask", mask);
+        //cv::waitKey(0);
+        img = mask;
+
+
+
+
+    }
+
 
 
     /*
@@ -307,8 +324,8 @@ BoundingBoxes::BoundingBoxes(const cv::Mat &input) {
         cv::Scalar color( rand()&255, rand()&255, rand()&255 );
         drawContours( out, contours, idx, color, cv::FILLED, 8, hierarchy );
     }
-    cv::imshow("Test", out);
-    cv::waitKey(0);
+    //cv::imshow("Test", out);
+    //cv::waitKey(0);
 
 
 
@@ -330,13 +347,27 @@ BoundingBoxes::BoundingBoxes(const cv::Mat &input) {
             cv::Point center = (boundingBox.tl() + boundingBox.br()) * 0.5;
             // Get the size of the text box
             int baseline = 0;
-            std::string text = std::to_string(contourNumber);
+            std::string text = std::to_string(8);
             cv::Size textSize = cv::getTextSize(text, fontFace, fontScale, thickness, &baseline);
             cv::Point textOrigin(center.x - textSize.width / 2, center.y + textSize.height / 2);
 
             cv::putText(out2, text, textOrigin, fontFace, fontScale, cv::Scalar(255, 0, 255), thickness);
             contourNumber++;
         }
+
+        // passo la cartella ---> per ogni immagine trovo i rectangle e li salvo in una struttura --->
+        // con un cerchio che sale in diagonale circa 120° guardo quali centri sono vicini tra di loro, questi sono la prima bbox
+        // maxima suppression per prendere i valori migliori ----> creo oggetto bounding box e lo salvo in lista definitiva
+
+        /*
+         *
+         Cluster Bounding Boxes by Location: Before applying Non-Maxima Suppression (NMS), you should
+         cluster the bounding boxes that correspond
+         to the same parking spot. This can be done by comparing
+         the centroid of each bounding box to see if they are within a certain distance threshold.
+         */
+
+
 
         /*
         // PRINT THE CONTOURS OF A BBOX

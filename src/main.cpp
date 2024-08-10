@@ -1,7 +1,7 @@
 #include <iostream>
 #include <filesystem>
 
-#include "../include/BoundingBoxes.hpp"
+#include "../include/ParkingSpaceDetector.hpp"
 #include "opencv4/opencv2/imgcodecs.hpp"
 #include "opencv4/opencv2/highgui.hpp"
 
@@ -17,20 +17,10 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    for (const auto& iter : std::filesystem::directory_iterator(pathSequenceFramesDir)) {
-        std::string imgPath = iter.path().string();
 
-        // Load the image
-        cv::Mat inputImg = cv::imread(imgPath);
-        if (inputImg.empty()) {
-            std::cout << "Error opening the image" << std::endl;
-            return -1;
-        }
-        BoundingBoxes BBoxes = BoundingBoxes(inputImg);
+    ParkingSpaceDetector BBoxes = ParkingSpaceDetector(pathSequenceFramesDir);
 
-        cv::Mat test = BBoxes.getImg();
-        //cv::imshow("mongus", test);
-        //cv::waitKey(0);
-    }
+
+
     return 0;
 }

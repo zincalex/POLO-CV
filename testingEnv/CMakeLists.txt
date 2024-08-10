@@ -6,8 +6,8 @@ find_package( OpenCV REQUIRED )
 include_directories( ${OpenCV_INCLUDE_DIRS} )
 
 add_library(BBox
-        ../include/BoundingBoxes.hpp
-        ../src/BoundingBoxes.cpp
+        ../include/ParkingSpaceDetector.hpp
+        ../src/ParkingSpaceDetector.cpp
 )
 
 add_executable(${PROJECT_NAME}

@@ -1,4 +1,4 @@
-#include "../include/ParkingSpaceDetection.hpp"
+#include "../include/ParkingSpaceDetector.hpp"
 
 
 const unsigned int CLOSE_KERNEL_SIZE = 9;
@@ -8,7 +8,7 @@ const unsigned int MAX_AREA_THRESHOLD = 60000;
 const unsigned int CIRCLE_NEIGHBORHOOD = 5;
 
 
-cv::Mat ParkingSpaceDetection::createROI(const cv::Mat& input) { // We focus the analysis of the image on the parking lots
+cv::Mat ParkingSpaceDetector::createROI(const cv::Mat& input) { // We focus the analysis of the image on the parking lots
     cv::Mat mask = cv::Mat::zeros(input.size(), CV_8UC1);
     cv::Mat result = cv::Mat::zeros(input.size(), input.type());
 
@@ -51,7 +51,7 @@ cv::Mat ParkingSpaceDetection::createROI(const cv::Mat& input) { // We focus the
     return result;
 }
 
-cv::Mat ParkingSpaceDetection::gamma_correction(const cv::Mat& input, const double& gamma) {
+cv::Mat ParkingSpaceDetector::gamma_correction(const cv::Mat& input, const double& gamma) {
     cv::Mat img_float, img_gamma;
 
     input.convertTo(img_float, CV_32F, 1.0 / 255.0);    // Convert to float and scale to [0, 1]
@@ -62,14 +62,14 @@ cv::Mat ParkingSpaceDetection::gamma_correction(const cv::Mat& input, const doub
     return img_gamma;
 }
 
-cv::Mat ParkingSpaceDetection::niBlack_thresholding(const cv::Mat& input, const int& blockSize, const double& k) {
+cv::Mat ParkingSpaceDetector::niBlack_thresholding(const cv::Mat& input, const int& blockSize, const double& k) {
     cv::Mat gray_image, niblack;
     cv::cvtColor(input, gray_image, cv::COLOR_BGR2GRAY);
     cv::ximgproc::niBlackThreshold(gray_image, niblack, 255, cv::THRESH_BINARY, blockSize, k, cv::ximgproc::BINARIZATION_NIBLACK);
     return niblack;
 }
 
-cv::Mat ParkingSpaceDetection::saturation_thresholding(const cv::Mat& input, const unsigned int& satThreshold) {
+cv::Mat ParkingSpaceDetector::saturation_thresholding(const cv::Mat& input, const unsigned int& satThreshold) {
     cv::Mat hsv_image, saturation;
 
     cv::cvtColor(input, hsv_image, cv::COLOR_BGR2HSV);
@@ -81,7 +81,7 @@ cv::Mat ParkingSpaceDetection::saturation_thresholding(const cv::Mat& input, con
     return saturation;
 }
 
-cv::Mat minFilter(const cv::Mat& src, const int& kernel_size) {
+cv::Mat ParkingSpaceDetector::minFilter(const cv::Mat& src, const int& kernel_size) {
     // Controls
     if(kernel_size % 2 == 0) throw std::invalid_argument("Error: kernel_size must be odd");
     if(src.channels() != 1) throw std::invalid_argument("Error: the image provided must have only one channel");
@@ -110,16 +110,89 @@ cv::Mat minFilter(const cv::Mat& src, const int& kernel_size) {
     return out;
 }
 
-ParkingSpaceDetection::ParkingSpaceDetection(const std::filesystem::path& emptyFramesDir) {
+bool ParkingSpaceDetector::isWithinRadius(const std::pair<int, int>& center, const std::pair<int, int>& point, const double& radius) {
+    double distance = std::sqrt(std::pow(center.first - point.first, 2) + std::pow(center.second - point.second, 2));
+    return distance <= radius;
+}
 
-    for (const auto& iter : std::filesystem::directory_iterator(emptyFramesDir) {
+
+
+
+
+double computeIoU(const cv::Rect& boxA, const cv::Rect& boxB) {
+    int xA = std::max(boxA.x, boxB.x);
+    int yA = std::max(boxA.y, boxB.y);
+    int xB = std::min(boxA.x + boxA.width, boxB.x + boxB.width);
+    int yB = std::min(boxA.y + boxA.height, boxB.y + boxB.height);
+
+    int interArea = std::max(0, xB - xA + 1) * std::max(0, yB - yA + 1);
+
+    int boxAArea = boxA.width * boxA.height;
+    int boxBArea = boxB.width * boxB.height;
+
+    double iou = static_cast<double>(interArea) / (boxAArea + boxBArea - interArea);
+
+    return iou;
+}
+
+
+// Non-Maxima Suppression function
+std::vector<cv::Rect> nonMaximaSuppression(const std::vector<cv::Rect>& boxes, const double& iouThreshold) {
+    if (boxes.size() == 1) return {boxes[0]};
+
+    std::vector<cv::Rect> selectedRect;
+
+    for (int i = 0; i < boxes.size(); i++) {
+        bool keep = true;
+
+        for (int j = i + 1; j < boxes.size(); j++) {
+            if (computeIoU(boxes[i], boxes[j]) > iouThreshold) {   // higher the tresh the better
+                keep = false;
+                break;
+            }
+        }
+
+        if (keep) {
+            selectedRect.push_back(boxes[i]);
+        }
+
+
+
+    }
+
+    return selectedRect;
+}
+
+void printClusters(const std::vector<std::map<std::pair<int, int>, cv::Rect>>& clusters) {
+    for (size_t i = 0; i < clusters.size(); ++i) {
+        std::cout << "Cluster " << i + 1 << ":" << std::endl;
+        for (const auto& entry : clusters[i]) {
+            std::cout << "  Key: (" << entry.first.first << ", " << entry.first.second << ")"
+                      << " Rect: [" << entry.second.x << ", " << entry.second.y << ", "
+                      << entry.second.width << ", " << entry.second.height << "]" << std::endl;
+        }
+        std::cout << std::endl;
+    }
+}
+
+
+
+
+// TODO create class for image pre processing
+ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFramesDir) {
+
+    const double RADIUS = 20.0;
+    const double IOU_THRESHOLD = 0.9;
+    std::map<std::pair<int, int>, cv::Rect> boundingBoxesCandidates;
+
+    // Image preprocessing and find the candidate
+    for (const auto& iter : std::filesystem::directory_iterator(emptyFramesDir)) {
         std::string imgPath = iter.path().string();
 
         // Load the image
         cv::Mat input = cv::imread(imgPath);
         if (input.empty()) {
-            std::cout << "Error opening the image" << std::endl;
-            return -1;
+            std::cerr << "Error opening the image" << std::endl;
         }
 
         int kernelSize = 5;
@@ -132,12 +205,10 @@ ParkingSpaceDetection::ParkingSpaceDetection(const std::filesystem::path& emptyF
         // Image Preprocessing
         cv::Mat roiInput = createROI(input);        // Focus on the parking lots, my ROI
 
-        // TODO might consider something with HSV, dont know yet
-        cv::Mat image = roiInput.clone();
 
         // TODO new sequence (GOOD BUT gne)
         cv::Mat gray;
-        cvtColor(image, gray, cv::COLOR_BGR2GRAY);
+        cvtColor(roiInput, gray, cv::COLOR_BGR2GRAY);
         cv::Mat blurred;
         int radius = 3;
         int kernel = 9;
@@ -171,7 +242,7 @@ ParkingSpaceDetection::ParkingSpaceDetection(const std::filesystem::path& emptyF
         //cv::waitKey(0);
 
 
-        cv::Mat gc_image = gamma_correction(image, GAMMA);
+        cv::Mat gc_image = gamma_correction(roiInput, GAMMA);
         //cv::imshow("Gamma", gc_image);
         //cv::waitKey(0);
         cv::Mat saturation = saturation_thresholding(gc_image, SATURATION_THRESHOLD);
@@ -218,44 +289,121 @@ ParkingSpaceDetection::ParkingSpaceDetection(const std::filesystem::path& emptyF
         //cv::waitKey(0);
         img = mask;
 
+        std::vector<std::vector<cv::Point>> contours;
+        std::vector<cv::Vec4i> hierarchy;
+        cv::findContours(mask, contours, hierarchy, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
+        cv::Mat out = input.clone();
+        // iterate through all the top-level contours,
+        // draw each connected component with its own random color
+        int idx = 0;
+        for( ; idx >= 0; idx = hierarchy[idx][0] )
+        {
+            cv::Scalar color( rand()&255, rand()&255, rand()&255 );
+            drawContours( out, contours, idx, color, cv::FILLED, 8, hierarchy );
+        }
+        //cv::imshow("Test", out);
+        //cv::waitKey(0);
 
 
+
+        cv::Mat out2 = input.clone();
+        int contourNumber = 1;
+        int fontFace = cv::FONT_HERSHEY_SIMPLEX;
+        double fontScale = 0.5;
+        int thickness = 2;
+
+
+
+        // Iterate through all the top-level contours
+        for(int idx = 0; idx >= 0; idx = hierarchy[idx][0]) {
+
+            cv::Rect rect = cv::boundingRect(contours[idx]);
+
+
+            if (rect.height > 18 && rect.width > 18 && rect.height < 200 && rect.width < 200) {
+
+
+                cv::Point center = (rect.tl() + rect.br()) * 0.5;
+                boundingBoxesCandidates.insert({std::make_pair(center.x, center.y), rect});
+                // Get the size of the text box
+
+
+                // Draw the bounding box on the output image
+                cv::rectangle(out2, rect.tl(), rect.br(), cv::Scalar(255, 0, 0), 2);
+                int baseline = 0;
+                std::string text = std::to_string(contourNumber);
+                cv::Size textSize = cv::getTextSize(text, fontFace, fontScale, thickness, &baseline);
+                cv::Point textOrigin(center.x - textSize.width / 2, center.y + textSize.height / 2);
+                cv::putText(out2, text, textOrigin, fontFace, fontScale, cv::Scalar(255, 0, 255), thickness);
+
+
+                contourNumber++;
+            }
+        }
+
+        cv::imshow("Sbu", out2);
+        cv::waitKey(0);
+    }
+
+    std::vector<std::map<std::pair<int, int>, cv::Rect>> clusters;
+
+    while (!boundingBoxesCandidates.empty()) {
+        std::map<std::pair<int, int>, cv::Rect> cluster;
+
+        auto iterator = boundingBoxesCandidates.begin();
+        std::pair<int, int> currentKey = iterator->first;
+        cluster[currentKey] = iterator ->second;
+        boundingBoxesCandidates.erase(iterator);
+
+
+        auto iterator2 = boundingBoxesCandidates.begin();
+        while (iterator2 != boundingBoxesCandidates.end()) {
+
+            std::pair<int, int> point = iterator2->first;
+            if (isWithinRadius(currentKey, point, RADIUS)) {
+                cluster[point] = iterator2->second;  // Add to the current cluster
+                iterator2 = boundingBoxesCandidates.erase(iterator2);  // Erase and get the next iterator
+            } else {
+                ++iterator2;  // Pre-increment for efficiency purpose
+            }
+        }
+        clusters.push_back(cluster);
+    }
+
+
+    for (const auto& cluster : clusters) {
+        std::vector<cv::Rect> boxes;
+        for (const auto& entry : cluster) {
+            boxes.push_back(entry.second);
+        }
+
+        // Apply Non-Maxima Suppression
+        std::vector<cv::Rect> finalBoxes = nonMaximaSuppression(boxes, IOU_THRESHOLD);
 
     }
 
+
+    printClusters(clusters);
+
+
+
+
+
+    // con un cerchio che sale in diagonale circa 120° guardo quali centri sono vicini tra di loro, questi sono la prima bbox
+    // maxima suppression per prendere i valori migliori ----> creo oggetto bounding box e lo salvo in lista definitiva
 
 
     /*
-    // CORNER DETECTION
-    std::vector<cv::Point2f> corners;
-    int maxCorners = 100;
-    double qualityLevel = 0.01;
-    double minDistance = 0.5;
+     *
+     Cluster Bounding Boxes by Location: Before applying Non-Maxima Suppression (NMS), you should
+     cluster the bounding boxes that correspond
+     to the same parking spot. This can be done by comparing
+     the centroid of each bounding box to see if they are within a certain distance threshold.
+     */
 
-    cv::Mat postM;
-    cv::preCornerDetect(mask, postM, 3);
-    cv::imshow("Pre C detect", postM);
-    cv::waitKey(0);
+}
 
-    cv::Mat inputMasked = mask & input;
-    cvtColor(inputMasked, inputMasked, cv::COLOR_BGR2GRAY);
-    cv::imshow("input masked", inputMasked);
-    cv::waitKey(0);
-    cv::goodFeaturesToTrack(inputMasked, corners, maxCorners, qualityLevel, minDistance);
-    // Parameters for corner refinement
-    //cv::Size winSize = cv::Size(5, 5);
-    //cv::Size zeroZone = cv::Size(-1, -1);
-    //cv::TermCriteria criteria = cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::MAX_ITER, 30, 0.001);
-    // Refine corners to sub-pixel accuracy
-    //cv::cornerSubPix(inputMasked, corners, winSize, zeroZone, criteria);
-    // Draw the corners
-    cv::Mat corn = input.clone();
-    for (size_t i = 0; i < corners.size(); i++) {
-        cv::circle(corn, corners[i], 3, cv::Scalar(0, 255, 0), cv::FILLED);
-    }
-    cv::imshow("Corn", corn);
-    cv::waitKey(0);
-    */
+
 
 
     /*
@@ -312,60 +460,9 @@ ParkingSpaceDetection::ParkingSpaceDetection(const std::filesystem::path& emptyF
     */
 
 
-    std::vector<std::vector<cv::Point>> contours;
-    std::vector<cv::Vec4i> hierarchy;
-    cv::findContours(mask, contours, hierarchy, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
-    cv::Mat out = input.clone();
-    // iterate through all the top-level contours,
-    // draw each connected component with its own random color
-    int idx = 0;
-    for( ; idx >= 0; idx = hierarchy[idx][0] )
-    {
-        cv::Scalar color( rand()&255, rand()&255, rand()&255 );
-        drawContours( out, contours, idx, color, cv::FILLED, 8, hierarchy );
-    }
-    //cv::imshow("Test", out);
-    //cv::waitKey(0);
 
 
 
-    cv::Mat out2 = input.clone();
-    // Iterate through all the top-level contours
-    int contourNumber = 1;
-    int fontFace = cv::FONT_HERSHEY_SIMPLEX;
-    double fontScale = 0.5;
-    int thickness = 2;
-    for(int idx = 0; idx >= 0; idx = hierarchy[idx][0]) {
-        // Get the bounding box for each contour
-        cv::Rect boundingBox = cv::boundingRect(contours[idx]);
-
-        // Draw the bounding box on the output image
-        if(boundingBox.height > 18 && boundingBox.width > 18 && boundingBox.height < 200 && boundingBox.width < 200) {
-            // Draw rectangle
-            cv::rectangle(out2, boundingBox.tl(), boundingBox.br(), cv::Scalar(255, 0, 0), 2);
-
-            cv::Point center = (boundingBox.tl() + boundingBox.br()) * 0.5;
-            // Get the size of the text box
-            int baseline = 0;
-            std::string text = std::to_string(8);
-            cv::Size textSize = cv::getTextSize(text, fontFace, fontScale, thickness, &baseline);
-            cv::Point textOrigin(center.x - textSize.width / 2, center.y + textSize.height / 2);
-
-            cv::putText(out2, text, textOrigin, fontFace, fontScale, cv::Scalar(255, 0, 255), thickness);
-            contourNumber++;
-        }
-
-        // passo la cartella ---> per ogni immagine trovo i rectangle e li salvo in una struttura --->
-        // con un cerchio che sale in diagonale circa 120° guardo quali centri sono vicini tra di loro, questi sono la prima bbox
-        // maxima suppression per prendere i valori migliori ----> creo oggetto bounding box e lo salvo in lista definitiva
-
-        /*
-         *
-         Cluster Bounding Boxes by Location: Before applying Non-Maxima Suppression (NMS), you should
-         cluster the bounding boxes that correspond
-         to the same parking spot. This can be done by comparing
-         the centroid of each bounding box to see if they are within a certain distance threshold.
-         */
 
 
 
@@ -381,11 +478,9 @@ ParkingSpaceDetection::ParkingSpaceDetection(const std::filesystem::path& emptyF
             std::cout << "Point: " << point << std::endl;
         */
 
-    }
-    cv::imshow("Sbu", out2);
-    cv::waitKey(0);
 
-}
+
+
 
 
 

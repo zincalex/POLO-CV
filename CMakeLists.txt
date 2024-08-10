@@ -5,12 +5,12 @@ set(CMAKE_CXX_STANDARD 17)
 find_package( OpenCV REQUIRED )
 include_directories( ${OpenCV_INCLUDE_DIRS} )
 
-add_library(BBox
-        include/BoundingBoxes.hpp
-        src/BoundingBoxes.cpp
+add_library(ParkingSpaceDetector
+        include/ParkingSpaceDetector.hpp
+        src/ParkingSpaceDetector.cpp
 )
 
 add_executable(${PROJECT_NAME}
         src/main.cpp)
 
-target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS} BBox)
+target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS} ParkingSpaceDetector)

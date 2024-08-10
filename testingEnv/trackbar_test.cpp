@@ -1,7 +1,7 @@
 #include <opencv2/opencv.hpp>
 #include <iostream>
 #include <filesystem>
-#include "../include/BoundingBoxes.hpp"
+#include "../include/ParkingSpaceDetector.hpp"
 using namespace cv;
 using namespace std;
 

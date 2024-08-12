@@ -1,33 +1,22 @@
 #include "../include/ParkingSpaceDetector.hpp"
 
-
-const unsigned int CLOSE_KERNEL_SIZE = 9;
-const unsigned int DILATE_KERNEL_SIZE = 5;
-const unsigned int MIN_AREA_THRESHOLD = 6000;
-const unsigned int MAX_AREA_THRESHOLD = 60000;
-const unsigned int CIRCLE_NEIGHBORHOOD = 5;
-
-
 cv::Mat ParkingSpaceDetector::createROI(const cv::Mat& input) { // We focus the analysis of the image on the parking lots
     cv::Mat mask = cv::Mat::zeros(input.size(), CV_8UC1);
     cv::Mat result = cv::Mat::zeros(input.size(), input.type());
 
     // Define ROIs
     std::vector<cv::RotatedRect> rois;
-    rois.push_back(cv::RotatedRect(cv::Point2f(580, 317), cv::Size2f(771, 282), 58));
-    rois.push_back(cv::RotatedRect(cv::Point2f(950, 192), cv::Size2f(165, 710), 128));
-    rois.push_back(cv::RotatedRect(cv::Point2f(1084, 83), cv::Size2f(452, 54), 28));
-    //rois.push_back(cv::RotatedRect(cv::Point2f(950, 200), cv::Size2f(165, 710), -54));
-    //rois.push_back(cv::RotatedRect(cv::Point2f(1136, 105), cv::Size2f(73, 467), 118));
+    rois.push_back(cv::RotatedRect(cv::Point(580, 317), cv::Size(771, 282), 58));
+    rois.push_back(cv::RotatedRect(cv::Point(950, 192), cv::Size(165, 710), 128));
+    rois.push_back(cv::RotatedRect(cv::Point(1084, 83), cv::Size(452, 54), 28));
 
-    std::vector<cv::RotatedRect> black_rois;        // More ad hoc ROI in order to refine the ROI selected
-    black_rois.push_back(cv::RotatedRect(cv::Point2f(777, 343), cv::Size2f(1227, 125), 47));
-    //black_rois.push_back(cv::RotatedRect(cv::Point2f(326, 3), cv::Size2f(62, 113), 50));  Parking lot high left
-    //black_rois.push_back(cv::RotatedRect(cv::Point2f(861, 25), cv::Size2f(552, 64), 33)); Old measures
-    black_rois.push_back(cv::RotatedRect(cv::Point2f(861, 30), cv::Size2f(1042, 72), 32));
+    // More ROI in order to refine the ROI selected
+    std::vector<cv::RotatedRect> black_rois;
+    black_rois.push_back(cv::RotatedRect(cv::Point(777, 343), cv::Size(1227, 125), 47));
+    black_rois.push_back(cv::RotatedRect(cv::Point(861, 30), cv::Size(1042, 72), 32));
 
     for (const auto& roiRect : rois) {
-        cv::Point2f vertices[4];
+        cv::Point2f vertices[4];    // Using cv::Point2f, insted of cv::Point, because it enables the .points method later
         std::vector<cv::Point> contour;
 
         roiRect.points(vertices);    // Store the vertices of the ROI
@@ -56,17 +45,9 @@ cv::Mat ParkingSpaceDetector::gamma_correction(const cv::Mat& input, const doubl
 
     input.convertTo(img_float, CV_32F, 1.0 / 255.0);    // Convert to float and scale to [0, 1]
     cv::pow(img_float, gamma, img_gamma);               // Gamma correction
-    img_gamma.convertTo(img_gamma, CV_8UC3, 255.0);       // Convert back to 8-bit type
+    img_gamma.convertTo(img_gamma, CV_8UC3, 255.0);     // Convert back to 8-bit type
 
-    CV_Assert(img_gamma.type() == CV_8UC3);
     return img_gamma;
-}
-
-cv::Mat ParkingSpaceDetector::niBlack_thresholding(const cv::Mat& input, const int& blockSize, const double& k) {
-    cv::Mat gray_image, niblack;
-    cv::cvtColor(input, gray_image, cv::COLOR_BGR2GRAY);
-    cv::ximgproc::niBlackThreshold(gray_image, niblack, 255, cv::THRESH_BINARY, blockSize, k, cv::ximgproc::BINARIZATION_NIBLACK);
-    return niblack;
 }
 
 cv::Mat ParkingSpaceDetector::saturation_thresholding(const cv::Mat& input, const unsigned int& satThreshold) {
@@ -74,27 +55,21 @@ cv::Mat ParkingSpaceDetector::saturation_thresholding(const cv::Mat& input, cons
 
     cv::cvtColor(input, hsv_image, cv::COLOR_BGR2HSV);
     cv::extractChannel(hsv_image, saturation, 1);
-
-    // Thresholding
     cv::threshold(saturation, saturation, satThreshold, 255, cv::THRESH_BINARY);
 
     return saturation;
 }
 
-cv::Mat ParkingSpaceDetector::minFilter(const cv::Mat& src, const int& kernel_size) {
-    // Controls
-    if(kernel_size % 2 == 0) throw std::invalid_argument("Error: kernel_size must be odd");
-    if(src.channels() != 1) throw std::invalid_argument("Error: the image provided must have only one channel");
-
-    cv::Mat out(src.rows, src.cols, CV_8U);
-    for(int i = 0; i < src.rows; i++) {
-        for(int j = 0; j < src.cols; j++) {
+cv::Mat ParkingSpaceDetector::minFilter(const cv::Mat& input, const int& kernel_size) {
+    cv::Mat out(input.size(), CV_8U);
+    for(int i = 0; i < input.rows; i++) {
+        for(int j = 0; j < input.cols; j++) {
             int min = 255;
             int temp;
             for(int x = -kernel_size/2; x <= kernel_size/2; x++) {
                 for(int y = -kernel_size/2; y <= kernel_size/2; y++) {
-                    if((i+x) >= 0 && (j+y) >= 0 && (i+x) < src.rows && (j+y) < src.cols) { // in case the kernel exceeds the image size
-                        temp = src.at<unsigned char> (i+x, j+y);
+                    if((i+x) >= 0 && (j+y) >= 0 && (i+x) < input.rows && (j + y) < input.cols) { // in case the kernel exceeds the image size
+                        temp = input.at<unsigned char> (i + x, j + y);
                         if(temp < min)
                             min = temp;
                     }
@@ -103,11 +78,74 @@ cv::Mat ParkingSpaceDetector::minFilter(const cv::Mat& src, const int& kernel_si
 
             for(int x = -kernel_size/2; x <= kernel_size/2; x++)
                 for(int y = -kernel_size/2; y <= kernel_size/2; y++)
-                    if((i+x) >= 0 && (j+y) >= 0 && (i+x) < src.rows && (j+y) < src.cols)
+                    if((i+x) >= 0 && (j+y) >= 0 && (i+x) < input.rows && (j + y) < input.cols)
                         out.at<unsigned char> (i+x, j+y) = min;
         }
     }
     return out;
+}
+
+cv::Mat ParkingSpaceDetector::maskCreation(const cv::Mat& inputImg) {
+    const int KERNEL_SIZE_GAUSSIAN_OTSU = 9;
+
+    const unsigned int KERNEL_SIZE_GAUSSIAN_ADAPTIVE = 5;
+    const unsigned int BLOCK_SIZE = 5;                        // Size of the pixel neighborhood used to calculate the threshold
+    const unsigned int C = 2;                                 // Constant subtracted from the mean or weighted mean
+    const unsigned int KERNEL_SIZE_MEDIAN_ADAPTIVE = 3;
+
+    const double GAMMA = 2.5;
+    const unsigned int SATURATION_THRESHOLD = 200;
+
+    const unsigned int KERNEL_SIZE_CANNY = 5;
+    const unsigned int LOW_THRESHOLD = 100;
+    const unsigned int RATIO = 22;
+
+    const unsigned int KERNEL_SIZE_CLOSING = 3;
+    const unsigned int KERNEL_SIZE_MIN = 5;
+
+    // TODO in case he want something general we create the mask then we do a template matching with a rect that increases size
+    // and that rotate with bin of 5 degree from 90 to -90, if the white part of the image correspond with lets say > 60 of the rect than is match
+    // in that case the final mask need to change. We do it that if sat mask has 1 the 0 in the final otherwise we keep what there is in the union of the others
+
+    // Focus the masking, consider only the 3 main areas where the parking lots are
+    cv::Mat roiInput = createROI(inputImg);
+
+    // Otsu mask
+    cv::Mat gray, blurred, highPass, otsuThresh;
+    cvtColor(roiInput, gray, cv::COLOR_BGR2GRAY);
+    GaussianBlur(gray, blurred, cv::Size(KERNEL_SIZE_GAUSSIAN_OTSU, KERNEL_SIZE_GAUSSIAN_OTSU), 0);
+    subtract(gray, blurred, highPass);  // Subtract the blurred image from the original image
+    highPass = highPass + 128;
+    threshold(highPass, otsuThresh, 0, 255, cv::THRESH_BINARY + cv::THRESH_OTSU);
+
+    // Adaptive mask
+    cv::Mat adaptive, roiGray;
+    cvtColor( roiInput, roiGray, cv::COLOR_BGR2GRAY );
+    GaussianBlur(roiGray, roiGray, cv::Size(KERNEL_SIZE_GAUSSIAN_ADAPTIVE,KERNEL_SIZE_GAUSSIAN_ADAPTIVE), 0);
+    cv::adaptiveThreshold(roiGray, adaptive, 255, cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY, BLOCK_SIZE, C);
+    cv::bitwise_not(adaptive, adaptive);
+    cv::medianBlur(adaptive, adaptive, KERNEL_SIZE_MEDIAN_ADAPTIVE);
+
+    // Saturation mask
+    cv::Mat gc_image = gamma_correction(roiInput, GAMMA);
+    cv::Mat saturation = saturation_thresholding(gc_image, SATURATION_THRESHOLD);
+
+    // Canny mask
+    cv::Mat roiCanny;
+    cvtColor( roiInput, roiGray, cv::COLOR_BGR2GRAY );
+    GaussianBlur(roiGray, roiGray, cv::Size(KERNEL_SIZE_CANNY, KERNEL_SIZE_CANNY), 0);
+    Canny(roiGray, roiCanny, LOW_THRESHOLD, LOW_THRESHOLD * RATIO, KERNEL_SIZE_CANNY );
+
+    // Union of the masks
+    cv::Mat mask = adaptive | roiCanny | otsuThresh | saturation;
+    cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(KERNEL_SIZE_CLOSING, KERNEL_SIZE_CLOSING)));
+    cv::bitwise_not(mask, mask);                      // Interested to find the areas between the lines,
+    cvtColor(mask, mask, cv::COLOR_GRAY2BGR);
+    mask = createROI(mask);                              // Adjust the white areas outside the ROI
+    cvtColor(mask, mask, cv::COLOR_BGR2GRAY);
+    mask = minFilter(mask, KERNEL_SIZE_MIN);
+
+    return mask;
 }
 
 bool ParkingSpaceDetector::isWithinRadius(const std::pair<int, int>& center, const std::pair<int, int>& point, const double& radius) {
@@ -115,53 +153,55 @@ bool ParkingSpaceDetector::isWithinRadius(const std::pair<int, int>& center, con
     return distance <= radius;
 }
 
+std::map<std::pair<int, int>, cv::Rect> ParkingSpaceDetector::nonMaximaSuppression(const std::map<std::pair<int, int>, cv::Rect>& parkingLotsBoxes, const float& iouThreshold) {
+    if (parkingLotsBoxes.size() == 1) return {parkingLotsBoxes}; // Only one candidate, hence my only bounding box
 
+    std::vector<cv::Rect> rects;
+    std::vector<std::pair<int, int>> centers;
+    std::vector<int> indices;
+    std::map<std::pair<int, int>, cv::Rect> validCandidates;
 
-
-
-double computeIoU(const cv::Rect& boxA, const cv::Rect& boxB) {
-    int xA = std::max(boxA.x, boxB.x);
-    int yA = std::max(boxA.y, boxB.y);
-    int xB = std::min(boxA.x + boxA.width, boxB.x + boxB.width);
-    int yB = std::min(boxA.y + boxA.height, boxB.y + boxB.height);
-
-    int interArea = std::max(0, xB - xA + 1) * std::max(0, yB - yA + 1);
-
-    int boxAArea = boxA.width * boxA.height;
-    int boxBArea = boxB.width * boxB.height;
-
-    double iou = static_cast<double>(interArea) / (boxAArea + boxBArea - interArea);
-
-    return iou;
-}
-
-
-// Non-Maxima Suppression function
-std::vector<cv::Rect> nonMaximaSuppression(const std::vector<cv::Rect>& boxes, const double& iouThreshold) {
-    if (boxes.size() == 1) return {boxes[0]};
-
-    std::vector<cv::Rect> selectedRect;
-
-    for (int i = 0; i < boxes.size(); i++) {
-        bool keep = true;
-
-        for (int j = i + 1; j < boxes.size(); j++) {
-            if (computeIoU(boxes[i], boxes[j]) > iouThreshold) {   // higher the tresh the better
-                keep = false;
-                break;
-            }
-        }
-
-        if (keep) {
-            selectedRect.push_back(boxes[i]);
-        }
-
-
-
+    for (const auto& entry : parkingLotsBoxes) {   // entry = (center, rect)
+        centers.push_back(entry.first);
+        rects.push_back(entry.second);
     }
 
-    return selectedRect;
+    // Despite being inside the deep neural network library, the function does NOT use deep learning
+    cv::dnn::NMSBoxes(rects, std::vector<float>(rects.size(), 1.0f), 0.0f, iouThreshold, indices);
+
+    // Populate the map
+    for (int idx : indices)
+        validCandidates[centers[idx]] = rects[idx];
+    return validCandidates;
 }
+
+std::vector<std::pair<cv::Point, cv::Rect>> ParkingSpaceDetector::computeAverageRect(const std::vector<std::map<std::pair<int, int>, cv::Rect>>& boundingBoxesNMS) {
+    std::vector<std::pair<cv::Point, cv::Rect>> averages;
+
+    for (const auto& parkingSpace : boundingBoxesNMS) {
+        unsigned int sumXCenter = 0, sumYCenter = 0, sumXTopLeft = 0, sumYTopLeft = 0;
+        unsigned int sumWidth = 0, sumHeight = 0;
+        unsigned int count = parkingSpace.size();
+
+        for (const auto& box : parkingSpace) {
+            sumXCenter += box.first.first;
+            sumYCenter += box.first.second;
+            sumXTopLeft += box.second.x;
+            sumYTopLeft += box.second.y;
+            sumWidth += box.second.width;
+            sumHeight += box.second.height;
+        }
+
+        cv::Point avgCenter(static_cast<int>(sumXCenter / count), static_cast<int>(sumYCenter / count));
+        cv::Rect avgRect = cv::Rect(static_cast<int>(sumXTopLeft / count), static_cast<int>(sumYTopLeft / count),
+                                    static_cast<int>(sumWidth / count), static_cast<int>(sumHeight / count));
+        averages.push_back(std::make_pair(avgCenter, avgRect));
+    }
+    return averages;
+}
+
+
+
 
 void printClusters(const std::vector<std::map<std::pair<int, int>, cv::Rect>>& clusters) {
     for (size_t i = 0; i < clusters.size(); ++i) {
@@ -175,14 +215,69 @@ void printClusters(const std::vector<std::map<std::pair<int, int>, cv::Rect>>& c
     }
 }
 
+void drawBoundingBoxes(cv::Mat& image, const std::vector<std::map<std::pair<int, int>, cv::Rect>>& clusters) {
+    for (const auto& cluster : clusters) {
+        for (const auto& entry : cluster) {
+            const cv::Rect& rect = entry.second;
+            cv::rectangle(image, rect, cv::Scalar(0, 255, 0), 2);  // Green box with thickness 2
+        }
+    }
+}
+
+void drawAverageBoundingBoxes(cv::Mat& image, const std::vector<std::pair<cv::Point, cv::Rect>>& averages) {
+    for (const auto& avg : averages) {
+        // Calculate the top-left corner of the rectangle
+        cv::Point topLeft = avg.second.tl();
+
+        // Draw the rectangle
+        cv::rectangle(image, topLeft, topLeft + cv::Point(avg.second.width, avg.second.height), cv::Scalar(0, 0, 255), 2);
+    }
+}
+
+cv::Point2f rotatePoint(const cv::Point2f& pt, const cv::Point2f& center, double angle) {
+    double rad = angle * CV_PI / 180.0;
+    double cosAngle = cos(rad);
+    double sinAngle = sin(rad);
+
+    cv::Point2f rotated;
+    rotated.x = cosAngle * (pt.x - center.x) - sinAngle * (pt.y - center.y) + center.x;
+    rotated.y = sinAngle * (pt.x - center.x) + cosAngle * (pt.y - center.y) + center.y;
+
+    return rotated;
+}
+
+void drawRotatedRectangles(cv::Mat& image, const std::vector<std::pair<cv::Point, cv::Rect>>& rects, double angle) {
+    for (const auto& pair : rects) {
+        cv::Point center = pair.first;
+        cv::Rect rect = pair.second;
+
+        // Calculate the corners of the rectangle
+        std::vector<cv::Point2f> corners(4);
+        corners[0] = cv::Point2f(rect.x, rect.y);
+        corners[1] = cv::Point2f(rect.x + rect.width, rect.y);
+        corners[2] = cv::Point2f(rect.x + rect.width, rect.y + rect.height);
+        corners[3] = cv::Point2f(rect.x, rect.y + rect.height);
+
+        // Rotate each corner around the center
+        std::vector<cv::Point2f> rotatedCorners(4);
+        for (int i = 0; i < 4; i++) {
+            rotatedCorners[i] = rotatePoint(corners[i], center, angle);
+        }
+
+        // Draw the rotated rectangle
+        for (int i = 0; i < 4; i++) {
+            cv::line(image, rotatedCorners[i], rotatedCorners[(i + 1) % 4], cv::Scalar(255, 0, 0), 2);
+        }
+    }
+}
 
 
 
 // TODO create class for image pre processing
 ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFramesDir) {
 
-    const double RADIUS = 20.0;
-    const double IOU_THRESHOLD = 0.9;
+    const double RADIUS = 30.0;
+    const float IOU_THRESHOLD = 0.95;
     std::map<std::pair<int, int>, cv::Rect> boundingBoxesCandidates;
 
     // Image preprocessing and find the candidate
@@ -195,293 +290,101 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
             std::cerr << "Error opening the image" << std::endl;
         }
 
-        int kernelSize = 5;
-        int lowThreshold = 100;
-        int ratio = 22;
-        double GAMMA = 2.5;
-        const unsigned int SATURATION_THRESHOLD = 200;
-        cv::Mat roiGray, roiCanny;
-
-        // Image Preprocessing
-        cv::Mat roiInput = createROI(input);        // Focus on the parking lots, my ROI
-
-
-        // TODO new sequence (GOOD BUT gne)
-        cv::Mat gray;
-        cvtColor(roiInput, gray, cv::COLOR_BGR2GRAY);
-        cv::Mat blurred;
-        int radius = 3;
-        int kernel = 9;
-        //int kernel = 2 * radius + 1;
-        GaussianBlur(gray, blurred, cv::Size(kernel, kernel), 0);
-        // Subtract the blurred image from the original image
-        cv::Mat highPass;
-        subtract(gray, blurred, highPass);
-        highPass = highPass + 128;
-        //cv::imshow("high", highPass);
-        //cv::waitKey(0);
-        cv::Mat otsuThresh;
-        threshold(highPass, otsuThresh, 0, 255, cv::THRESH_BINARY + cv::THRESH_OTSU);
-        //cv::imshow("otsu thresh", otsuThresh);
-        //cv::waitKey(0);
-        //cv::medianBlur(otsuThresh, otsuThresh, 3);
-        //cv::imshow("otsu thresh AFTER", otsuThresh);
-        //cv::waitKey(0);
-
-
-        // TODO THIS sequence is real good
-        cv::Mat sugoi;
-        cvtColor( roiInput, roiGray, cv::COLOR_BGR2GRAY );
-        GaussianBlur(roiGray, roiGray, cv::Size(5,5), 0);
-        int blockSize = 5; // Size of the pixel neighborhood used to calculate the threshold
-        int C = 2;          // Constant subtracted from the mean or weighted mean
-        cv::adaptiveThreshold(roiGray, roiGray, 255, cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY, blockSize, C);
-        cv::bitwise_not(roiGray, roiGray);
-        cv::medianBlur(roiGray, sugoi, 3);
-        //cv::imshow("adaptive", sugoi);
-        //cv::waitKey(0);
-
-
-        cv::Mat gc_image = gamma_correction(roiInput, GAMMA);
-        //cv::imshow("Gamma", gc_image);
-        //cv::waitKey(0);
-        cv::Mat saturation = saturation_thresholding(gc_image, SATURATION_THRESHOLD);
-        //cv::imshow("Sat", saturation);
-        //cv::waitKey(0);
-
-        const unsigned int NIBLACK_BLOCK_SIZE = 9;
-        const double NIBLACK_K = 0.9;
-        cv::Mat niblack = niBlack_thresholding(roiInput, NIBLACK_BLOCK_SIZE, NIBLACK_K);
-        //cv::imshow("NI", niblack);
-        //cv::waitKey(0);
-
-
-        cvtColor( roiInput, roiGray, cv::COLOR_BGR2GRAY );
-        GaussianBlur(roiGray, roiGray, cv::Size(kernelSize,kernelSize), 0);
-        Canny( roiGray, roiCanny, lowThreshold, lowThreshold*ratio, kernelSize );
-        //cv::imshow("Canny", roiCanny);
-        //cv::waitKey(0);
-
-
-        cv::Mat mask =  sugoi | roiCanny | otsuThresh | saturation;
-        //cv::morphologyEx(mask, mask, cv::MORPH_OPEN, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3)));
-        //cv::imshow("Union masks", mask);
-        //cv::waitKey(0);
-        //cv::medianBlur(mask, mask, 3);
-        //cv::imshow("After median mask", mask);
-        //cv::waitKey(0);
-        cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(3, 3)));
-        //cv::morphologyEx(mask, mask, cv::MORPH_DILATE, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3)));
-        //cv::imshow("After dialte mask", mask);
-        //cv::waitKey(0);
-
-
-        // CONVERSTION TO WHITE BLACK
-        cv::bitwise_not(mask, mask);
-        cvtColor(mask, mask, cv::COLOR_GRAY2BGR);
-        mask = createROI(mask);
-        cvtColor(mask, mask, cv::COLOR_BGR2GRAY);
-
-        //cv::imshow("Final mask", mask);
-        //cv::waitKey(0);
-        mask = minFilter(mask, 5);
-        //cv::imshow("After min mask", mask);
-        //cv::waitKey(0);
+        cv::Mat mask = maskCreation(input);
         img = mask;
 
         std::vector<std::vector<cv::Point>> contours;
         std::vector<cv::Vec4i> hierarchy;
         cv::findContours(mask, contours, hierarchy, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
+
+
+        /*
+         * DRAW THE MASK COLORED
         cv::Mat out = input.clone();
-        // iterate through all the top-level contours,
-        // draw each connected component with its own random color
         int idx = 0;
         for( ; idx >= 0; idx = hierarchy[idx][0] )
         {
             cv::Scalar color( rand()&255, rand()&255, rand()&255 );
             drawContours( out, contours, idx, color, cv::FILLED, 8, hierarchy );
         }
-        //cv::imshow("Test", out);
-        //cv::waitKey(0);
+        cv::imshow("Test", out);
+        cv::waitKey(0);
+        */
 
 
-
-        cv::Mat out2 = input.clone();
+        cv::Mat out = input.clone();
         int contourNumber = 1;
         int fontFace = cv::FONT_HERSHEY_SIMPLEX;
         double fontScale = 0.5;
-        int thickness = 2;
 
-
-
-        // Iterate through all the top-level contours
+        // Save the information for bounding box candidates
         for(int idx = 0; idx >= 0; idx = hierarchy[idx][0]) {
-
             cv::Rect rect = cv::boundingRect(contours[idx]);
 
-
+            // Filter out small and large rects
             if (rect.height > 18 && rect.width > 18 && rect.height < 200 && rect.width < 200) {
-
-
                 cv::Point center = (rect.tl() + rect.br()) * 0.5;
+
+                // The key cv::Point cannot be used because it has not the operator< , which maps relies on
                 boundingBoxesCandidates.insert({std::make_pair(center.x, center.y), rect});
-                // Get the size of the text box
 
 
                 // Draw the bounding box on the output image
-                cv::rectangle(out2, rect.tl(), rect.br(), cv::Scalar(255, 0, 0), 2);
+                cv::rectangle(out, rect.tl(), rect.br(), cv::Scalar(255, 0, 0), 2);
                 int baseline = 0;
                 std::string text = std::to_string(contourNumber);
-                cv::Size textSize = cv::getTextSize(text, fontFace, fontScale, thickness, &baseline);
+                cv::Size textSize = cv::getTextSize(text, fontFace, fontScale, 2, &baseline);
                 cv::Point textOrigin(center.x - textSize.width / 2, center.y + textSize.height / 2);
-                cv::putText(out2, text, textOrigin, fontFace, fontScale, cv::Scalar(255, 0, 255), thickness);
-
-
+                cv::putText(out, text, textOrigin, fontFace, fontScale, cv::Scalar(255, 0, 255), 2);
                 contourNumber++;
             }
         }
-
-        cv::imshow("Sbu", out2);
-        cv::waitKey(0);
+        //cv::imshow("Candidates", out);
+        //cv::waitKey(0);
     }
 
-    std::vector<std::map<std::pair<int, int>, cv::Rect>> clusters;
 
+    std::vector<std::map<std::pair<int, int>, cv::Rect>> boundingBoxesNonMaximaSupp;
     while (!boundingBoxesCandidates.empty()) {
-        std::map<std::pair<int, int>, cv::Rect> cluster;
+        std::map<std::pair<int, int>, cv::Rect> parkingSpaceBoxes;
 
+        // First populate the map with the first not analyzed parking space
         auto iterator = boundingBoxesCandidates.begin();
-        std::pair<int, int> currentKey = iterator->first;
-        cluster[currentKey] = iterator ->second;
-        boundingBoxesCandidates.erase(iterator);
+        std::pair<int, int> centerParkingSpace = iterator->first;
+        parkingSpaceBoxes[centerParkingSpace] = iterator ->second;
+        boundingBoxesCandidates.erase(iterator); // remove it in order to not insert it twice
 
-
+        // Look for all the other candidates if there is one that represent the same parking lot
         auto iterator2 = boundingBoxesCandidates.begin();
         while (iterator2 != boundingBoxesCandidates.end()) {
-
-            std::pair<int, int> point = iterator2->first;
-            if (isWithinRadius(currentKey, point, RADIUS)) {
-                cluster[point] = iterator2->second;  // Add to the current cluster
+            std::pair<int, int> anotherCenter = iterator2->first;
+            if (isWithinRadius(centerParkingSpace, anotherCenter, RADIUS)) {
+                parkingSpaceBoxes[anotherCenter] = iterator2->second;
                 iterator2 = boundingBoxesCandidates.erase(iterator2);  // Erase and get the next iterator
             } else {
                 ++iterator2;  // Pre-increment for efficiency purpose
             }
         }
-        clusters.push_back(cluster);
+
+        // All candidates for a parking space are found, need to clear them with nms
+        std::map<std::pair<int, int>, cv::Rect> validBoxes = nonMaximaSuppression(parkingSpaceBoxes, IOU_THRESHOLD);
+        boundingBoxesNonMaximaSupp.push_back(validBoxes);
     }
 
+    std::vector<std::pair<cv::Point, cv::Rect>> finalBoundingBoxes = computeAverageRect(boundingBoxesNonMaximaSupp);
 
-    for (const auto& cluster : clusters) {
-        std::vector<cv::Rect> boxes;
-        for (const auto& entry : cluster) {
-            boxes.push_back(entry.second);
-        }
 
-        // Apply Non-Maxima Suppression
-        std::vector<cv::Rect> finalBoxes = nonMaximaSuppression(boxes, IOU_THRESHOLD);
+
+    // applicare a tutte le cordinate una rotarione
+    // FINAL DRAW
+    for (const auto& iter : std::filesystem::directory_iterator(emptyFramesDir)) {
+        std::string imgPath = iter.path().string();
+
+        // Load the image
+        cv::Mat input = cv::imread(imgPath);
+        drawRotatedRectangles(input, finalBoundingBoxes, 10);
+        cv::imshow("sium", input);
+        cv::waitKey(0);
 
     }
-
-
-    printClusters(clusters);
-
-
-
-
-
-    // con un cerchio che sale in diagonale circa 120° guardo quali centri sono vicini tra di loro, questi sono la prima bbox
-    // maxima suppression per prendere i valori migliori ----> creo oggetto bounding box e lo salvo in lista definitiva
-
-
-    /*
-     *
-     Cluster Bounding Boxes by Location: Before applying Non-Maxima Suppression (NMS), you should
-     cluster the bounding boxes that correspond
-     to the same parking spot. This can be done by comparing
-     the centroid of each bounding box to see if they are within a certain distance threshold.
-     */
-
 }
-
-
-
-
-    /*
-    // Hough Transform
-    std::vector<cv::Vec4i> hough_lines;
-    cv::HoughLinesP(mask, hough_lines, 1, CV_PI /180, 40, 25, 4);
-
-    for (auto l : hough_lines) {
-        cv::line(hough_lines_image, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]), cv::Scalar(0,0, 255));
-    }
-    */
-
-    // Other hough
-
-
-
-    // Close lines that have almost same slope can be removed by using lower angle resolutions for the theta argument of Hough Line method. For example using π/180
-    // would result in finding lines that differ only by one degree in their slope. You may use 5*π/180 to find lines in 5 degree resolution.
-
-
-
-    // DRAW LINES
-    /*
-    std::vector<cv::Vec2f> linesDown;
-    cv::HoughLines(mask, linesDown, 5, 5 * CV_PI/180, 150, 0, 0, -5* CV_PI / 12, -  7 * CV_PI / 18);
-    cv::Mat hough_lines_image = mask.clone();
-    cv::cvtColor(mask, hough_lines_image, cv::COLOR_GRAY2BGR);
-    for (size_t i = 0; i < linesDown.size(); i++) {
-        float rho = linesDown[i][0], theta = linesDown[i][1];
-        double a = cos(theta), b = sin(theta);
-        double x0 = a * rho, y0 = b * rho ;
-        double length = 1500;
-        cv::Point pt1(cvRound(x0 + length * (-b)), cvRound(y0 + length * (a)));
-        cv::Point pt2(cvRound(x0 - length * (-b)), cvRound(y0 - length * (a)));
-        cv::line(hough_lines_image, pt1, pt2, cv::Scalar(255, 0, 255), 1, cv::LINE_AA);
-    }
-
-
-    /*
-    std::vector<cv::Vec2f> linesUp;
-    // 55 -- 65 --- 86 the angles
-    cv::HoughLines(mask, linesUp, 5, 5 * CV_PI/180, 300, 0, 0,  5* CV_PI / 18,   87* CV_PI / 180);
-    cv::Mat hough_lines_image = mask.clone();
-    cv::cvtColor(mask, hough_lines_image, cv::COLOR_GRAY2BGR);
-    for (size_t i = 0; i < linesUp.size(); i++) {
-        float rho = linesUp[i][0], theta = linesUp[i][1];
-        double a = cos(theta), b = sin(theta);
-        double x0 = a * rho, y0 = b * rho ;
-        double length = 1500;
-        cv::Point pt1(cvRound(x0 + length * (-b)), cvRound(y0 + length * (a)));
-        cv::Point pt2(cvRound(x0 - length * (-b)), cvRound(y0 - length * (a)));
-        cv::line(hough_lines_image, pt1, pt2, cv::Scalar(255, 0, 255), 1, cv::LINE_AA); // Blue color for lines2
-    }
-    */
-
-
-
-
-
-
-
-
-        /*
-        // PRINT THE CONTOURS OF A BBOX
-        std::vector<cv::Point> boundingBoxPoints;
-        boundingBoxPoints.push_back(boundingBox.tl()); // Top-left
-        boundingBoxPoints.push_back(cv::Point(boundingBox.x + boundingBox.width, boundingBox.y)); // Top-right
-        boundingBoxPoints.push_back(cv::Point(boundingBox.x, boundingBox.y + boundingBox.height)); // Bottom-left
-        boundingBoxPoints.push_back(boundingBox.br()); // Bottom-right
-
-        for (const auto& point : boundingBoxPoints)
-            std::cout << "Point: " << point << std::endl;
-        */
-
-
-
-
-
-
-
-

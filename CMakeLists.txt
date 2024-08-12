@@ -10,7 +10,13 @@ add_library(ParkingSpaceDetector
         src/ParkingSpaceDetector.cpp
 )
 
-add_executable(${PROJECT_NAME}
-        src/main.cpp)
+add_library(BBox
+        include/BoundingBox.hpp
+        src/BoundingBox.cpp
+)
 
-target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS} ParkingSpaceDetector)
+add_executable(${PROJECT_NAME}
+        src/main.cpp
+)
+
+target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS} ParkingSpaceDetector BBox)

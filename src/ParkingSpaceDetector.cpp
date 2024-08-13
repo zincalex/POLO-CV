@@ -200,77 +200,18 @@ std::vector<std::pair<cv::Point, cv::Rect>> ParkingSpaceDetector::computeAverage
     return averages;
 }
 
-
-
-
-void printClusters(const std::vector<std::map<std::pair<int, int>, cv::Rect>>& clusters) {
-    for (size_t i = 0; i < clusters.size(); ++i) {
-        std::cout << "Cluster " << i + 1 << ":" << std::endl;
-        for (const auto& entry : clusters[i]) {
-            std::cout << "  Key: (" << entry.first.first << ", " << entry.first.second << ")"
-                      << " Rect: [" << entry.second.x << ", " << entry.second.y << ", "
-                      << entry.second.width << ", " << entry.second.height << "]" << std::endl;
-        }
-        std::cout << std::endl;
-    }
-}
-
-void drawBoundingBoxes(cv::Mat& image, const std::vector<std::map<std::pair<int, int>, cv::Rect>>& clusters) {
-    for (const auto& cluster : clusters) {
-        for (const auto& entry : cluster) {
-            const cv::Rect& rect = entry.second;
-            cv::rectangle(image, rect, cv::Scalar(0, 255, 0), 2);  // Green box with thickness 2
-        }
-    }
-}
-
-void drawAverageBoundingBoxes(cv::Mat& image, const std::vector<std::pair<cv::Point, cv::Rect>>& averages) {
-    for (const auto& avg : averages) {
-        // Calculate the top-left corner of the rectangle
-        cv::Point topLeft = avg.second.tl();
-
-        // Draw the rectangle
-        cv::rectangle(image, topLeft, topLeft + cv::Point(avg.second.width, avg.second.height), cv::Scalar(0, 0, 255), 2);
-    }
-}
-
-cv::Point2f rotatePoint(const cv::Point2f& pt, const cv::Point2f& center, double angle) {
-    double rad = angle * CV_PI / 180.0;
-    double cosAngle = cos(rad);
-    double sinAngle = sin(rad);
-
-    cv::Point2f rotated;
-    rotated.x = cosAngle * (pt.x - center.x) - sinAngle * (pt.y - center.y) + center.x;
-    rotated.y = sinAngle * (pt.x - center.x) + cosAngle * (pt.y - center.y) + center.y;
-
-    return rotated;
-}
-
-void drawRotatedRectangles(cv::Mat& image, const std::vector<std::pair<cv::Point, cv::Rect>>& rects, double angle) {
+std::vector<cv::RotatedRect> ParkingSpaceDetector::rotateBoundingBoxes(const std::vector<std::pair<cv::Point, cv::Rect>>& rects, const float& angle) {
+    std::vector<cv::RotatedRect> rotatedBBoxes;
     for (const auto& pair : rects) {
         cv::Point center = pair.first;
         cv::Rect rect = pair.second;
 
-        // Calculate the corners of the rectangle
-        std::vector<cv::Point2f> corners(4);
-        corners[0] = cv::Point2f(rect.x, rect.y);
-        corners[1] = cv::Point2f(rect.x + rect.width, rect.y);
-        corners[2] = cv::Point2f(rect.x + rect.width, rect.y + rect.height);
-        corners[3] = cv::Point2f(rect.x, rect.y + rect.height);
-
-        // Rotate each corner around the center
-        std::vector<cv::Point2f> rotatedCorners(4);
-        for (int i = 0; i < 4; i++) {
-            rotatedCorners[i] = rotatePoint(corners[i], center, angle);
-        }
-
-        // Draw the rotated rectangle
-        for (int i = 0; i < 4; i++) {
-            cv::line(image, rotatedCorners[i], rotatedCorners[(i + 1) % 4], cv::Scalar(255, 0, 0), 2);
-        }
+        cv::Size size(rect.width, rect.height);
+        cv::RotatedRect rotatedBBox(center, size, angle);
+        rotatedBBoxes.push_back(rotatedBBox);
     }
+    return rotatedBBoxes;
 }
-
 
 
 // TODO create class for image pre processing
@@ -278,6 +219,8 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
 
     const double RADIUS = 30.0;
     const float IOU_THRESHOLD = 0.95;
+    const float ANGLE = 10.0;
+
     std::map<std::pair<int, int>, cv::Rect> boundingBoxesCandidates;
 
     // Image preprocessing and find the candidate
@@ -291,12 +234,9 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
         }
 
         cv::Mat mask = maskCreation(input);
-        img = mask;
-
         std::vector<std::vector<cv::Point>> contours;
         std::vector<cv::Vec4i> hierarchy;
         cv::findContours(mask, contours, hierarchy, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
-
 
         /*
          * DRAW THE MASK COLORED
@@ -311,12 +251,6 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
         cv::waitKey(0);
         */
 
-
-        cv::Mat out = input.clone();
-        int contourNumber = 1;
-        int fontFace = cv::FONT_HERSHEY_SIMPLEX;
-        double fontScale = 0.5;
-
         // Save the information for bounding box candidates
         for(int idx = 0; idx >= 0; idx = hierarchy[idx][0]) {
             cv::Rect rect = cv::boundingRect(contours[idx]);
@@ -327,22 +261,9 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
 
                 // The key cv::Point cannot be used because it has not the operator< , which maps relies on
                 boundingBoxesCandidates.insert({std::make_pair(center.x, center.y), rect});
-
-
-                // Draw the bounding box on the output image
-                cv::rectangle(out, rect.tl(), rect.br(), cv::Scalar(255, 0, 0), 2);
-                int baseline = 0;
-                std::string text = std::to_string(contourNumber);
-                cv::Size textSize = cv::getTextSize(text, fontFace, fontScale, 2, &baseline);
-                cv::Point textOrigin(center.x - textSize.width / 2, center.y + textSize.height / 2);
-                cv::putText(out, text, textOrigin, fontFace, fontScale, cv::Scalar(255, 0, 255), 2);
-                contourNumber++;
             }
         }
-        //cv::imshow("Candidates", out);
-        //cv::waitKey(0);
     }
-
 
     std::vector<std::map<std::pair<int, int>, cv::Rect>> boundingBoxesNonMaximaSupp;
     while (!boundingBoxesCandidates.empty()) {
@@ -372,19 +293,12 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
     }
 
     std::vector<std::pair<cv::Point, cv::Rect>> finalBoundingBoxes = computeAverageRect(boundingBoxesNonMaximaSupp);
+    std::vector<cv::RotatedRect> finalRotatedBoundingBoxes = rotateBoundingBoxes(finalBoundingBoxes, ANGLE);
 
-
-
-    // applicare a tutte le cordinate una rotarione
-    // FINAL DRAW
-    for (const auto& iter : std::filesystem::directory_iterator(emptyFramesDir)) {
-        std::string imgPath = iter.path().string();
-
-        // Load the image
-        cv::Mat input = cv::imread(imgPath);
-        drawRotatedRectangles(input, finalBoundingBoxes, 10);
-        cv::imshow("sium", input);
-        cv::waitKey(0);
-
+    unsigned short parkNumber = 1;
+    for (const cv::RotatedRect rotRect : finalRotatedBoundingBoxes) {
+        BoundingBox bbox = BoundingBox(rotRect, parkNumber++);
+        bBoxes.push_back(bbox);
     }
+
 }

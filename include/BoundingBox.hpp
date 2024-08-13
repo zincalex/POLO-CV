@@ -5,25 +5,25 @@
 
 class BoundingBox {
 public:
-    BoundingBox(const cv::Point& center, const cv::Rect& rect, const unsigned short& number, const bool& occupied = false);
+    BoundingBox(const cv::RotatedRect& rect, const unsigned short& number, const bool& occupied = false);
 
     void updateState();
 
-    cv::Point getTlCorner() {return rect.tl();}
-    cv::Point getBrCorner() {return rect.br();}
-    cv::Point getCenter() {return center;}
-    unsigned short getHeight() {return rect.height;}
-    unsigned short getWidth() {return rect.width;}
-    unsigned short getNumber() {return number;}
-    //unsigned short getAngle() {return angle;}
-    bool isOccupied() {return occupied;}
+    cv::Point getTlCorner() const;
+    cv::Point getBrCorner() const;
+
+    float getAngle() const           { return rect.angle; }
+    bool isOccupied() const          { return occupied; }
+    cv::Point getCenter() const      { return center; }
+    unsigned short getNumber() const { return number; }
+    unsigned short getHeight() const { return static_cast<unsigned short>(rect.size.height); }
+    unsigned short getWidth()  const { return static_cast<unsigned short>(rect.size.height); }
+
 
 private:
-
     cv::Point center;
-    cv::Rect rect;
+    cv::RotatedRect rect;
     unsigned short number;
-    //unsigned short angle;
     bool occupied;
 };
 

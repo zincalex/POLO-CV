@@ -17,12 +17,9 @@ class ParkingSpaceDetector {
 public:
     ParkingSpaceDetector(const std::filesystem::path& emptyFramesDir);
 
-
     std::vector<BoundingBox> getBBoxes() { return bBoxes; }
-    cv::Mat getImg() {return img;}
 
 private:
-    cv::Mat img;
     std::vector<BoundingBox> bBoxes;
 
     cv::Mat maskCreation(const cv::Mat& inputImg);
@@ -34,6 +31,7 @@ private:
 
     std::map<std::pair<int, int>, cv::Rect> nonMaximaSuppression(const std::map<std::pair<int, int>, cv::Rect>& parkingLotsBoxes, const float& iouThreshold);
     std::vector<std::pair<cv::Point, cv::Rect>> computeAverageRect(const std::vector<std::map<std::pair<int, int>, cv::Rect>>& boundingBoxesNMS);
+    std::vector<cv::RotatedRect> rotateBoundingBoxes(const std::vector<std::pair<cv::Point, cv::Rect>>& rects, const float& angle);
 };
 
 #endif

@@ -1,9 +1,0 @@
-Main
-    for each frame of the provided sequences; this high level information
-    should be displayed as a 2D top-view minimap (receive multiple images and 
-    return the same number with a 2D map -- see how to make map)
-
-Calibration
-    The benchmark dataset includes also an additional sequence (i.e., “sequence0”) containing 5 images of the empty
-    parking lot without carsdiffering in illumination conditions. These images should be used
-    to compute an initial estimate of the location of each parking space in a simplified scenario, to be refined later on the images of the other sequences.

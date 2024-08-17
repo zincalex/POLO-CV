@@ -12,9 +12,11 @@ public:
     cv::Point getTlCorner() const;
     cv::Point getBrCorner() const;
 
-    float getAngle() const           { return rect.angle; }
-    bool isOccupied() const          { return occupied; }
+
     cv::Point getCenter() const      { return center; }
+    cv::Size getSize() const         { return rect.size; }
+    bool isOccupied() const          { return occupied; }
+    float getAngle() const           { return rect.angle; }
     unsigned short getNumber() const { return number; }
     unsigned short getHeight() const { return static_cast<unsigned short>(rect.size.height); }
     unsigned short getWidth()  const { return static_cast<unsigned short>(rect.size.height); }

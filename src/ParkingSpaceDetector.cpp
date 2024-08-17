@@ -94,7 +94,7 @@ cv::Mat ParkingSpaceDetector::maskCreation(const cv::Mat& inputImg) {
     const unsigned int KERNEL_SIZE_MEDIAN_ADAPTIVE = 3;
 
     const double GAMMA = 2.5;
-    const unsigned int SATURATION_THRESHOLD = 200;
+    const unsigned int SATURATION_THRESHOLD = 150;
 
     const unsigned int KERNEL_SIZE_CANNY = 5;
     const unsigned int LOW_THRESHOLD = 100;
@@ -300,5 +300,4 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
         BoundingBox bbox = BoundingBox(rotRect, parkNumber++);
         bBoxes.push_back(bbox);
     }
-
 }

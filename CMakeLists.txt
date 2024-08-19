@@ -25,8 +25,13 @@ add_library(Xml
         src/XMLReader.cpp
 )
 
+add_library(Metrics
+        include/Metrics.hpp
+        src/Metrics.cpp
+)
+
 add_executable(${PROJECT_NAME}
         src/main.cpp
 )
 
-target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS} ParkingSpaceDetector ParkingLotStatus Xml BBox)
+target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS} ParkingSpaceDetector ParkingLotStatus Xml Metrics BBox)

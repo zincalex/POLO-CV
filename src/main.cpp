@@ -57,6 +57,9 @@ int main(int argc, char** argv) {
         cv::Mat parkingImg = cv::imread(imgPath);
         ParkingLotStatus parkingStatus = ParkingLotStatus(parkingImg, groundTruth.getBBoxes());
 
+        parkingStatus.drawParkingLotStatus();
+        cv::imshow("status", parkingStatus.getStatusImage());
+        cv::waitKey(0);
 
         // First Metric
 

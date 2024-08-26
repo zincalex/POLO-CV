@@ -2,6 +2,7 @@
 #define PARKINGLOTSTATUS_HPP
 
 #include "../include/BoundingBox.hpp"
+#include "../include/ImageProcessing.hpp"
 
 #include <opencv2/imgproc.hpp>
 #include <filesystem>

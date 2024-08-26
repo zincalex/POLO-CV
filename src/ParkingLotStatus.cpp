@@ -31,25 +31,7 @@ cv::Mat createROI(const cv::Mat& image, const BoundingBox& bBox) {
     return flippedImage; // Return the warped (straightened) image
 }
 
-cv::Mat gamma_correction(const cv::Mat& input, const double& gamma) {
-    cv::Mat img_float, img_gamma;
 
-    input.convertTo(img_float, CV_32F, 1.0 / 255.0);    // Convert to float and scale to [0, 1]
-    cv::pow(img_float, gamma, img_gamma);               // Gamma correction
-    img_gamma.convertTo(img_gamma, CV_8UC3, 255.0);     // Convert back to 8-bit type
-
-    return img_gamma;
-}
-
-cv::Mat saturation_thresholding(const cv::Mat& input, const unsigned int& satThreshold) {
-    cv::Mat hsv_image, saturation;
-
-    cv::cvtColor(input, hsv_image, cv::COLOR_BGR2HSV);
-    cv::extractChannel(hsv_image, saturation, 1);
-    cv::threshold(saturation, saturation, satThreshold, 255, cv::THRESH_BINARY);
-
-    return saturation;
-}
 
 cv::Mat ParkingLotStatus::createMaskBlackishColors(const cv::Mat& image) const {
     cv::Mat mask = cv::Mat::zeros(image.size(), CV_8U);
@@ -103,19 +85,6 @@ void ParkingLotStatus::drawParkingLotStatus() {
 
     }
 }
-
-
-
-
-cv::Mat adjustContrast(const cv::Mat& inputImg, double alpha, int beta) {
-    cv::Mat newImage = cv::Mat::zeros(inputImg.size(), inputImg.type());
-
-    // Applica la regolazione di contrasto e luminosità
-    inputImg.convertTo(newImage, -1, alpha, beta);
-
-    return newImage;
-}
-
 
 
 int kernelSizeGaussian = 7; // Size for Gaussian Blur (should be odd)
@@ -350,7 +319,7 @@ ParkingLotStatus::ParkingLotStatus(const cv::Mat& parkingImage, std::vector<Boun
 
 
 
-        /*
+
         // REAL METHOD
         // WHITE CHECK
         int totalPixels = boxedInputImg.rows * boxedInputImg.cols;
@@ -366,8 +335,8 @@ ParkingLotStatus::ParkingLotStatus(const cv::Mat& parkingImage, std::vector<Boun
             continue;
         }
         else { // COLOR CHECK
-            cv::Mat gc_image = gamma_correction(boxedInputImg, GAMMA);
-            cv::Mat saturation = saturation_thresholding(gc_image, SATURATION_THRESHOLD);
+            cv::Mat gc_image = ImageProcessing::gamma_correction(boxedInputImg, GAMMA);
+            cv::Mat saturation = ImageProcessing::saturation_thresholding(gc_image, SATURATION_THRESHOLD);
             cv::imshow("sat", saturation);
             cv::waitKey(0);
 
@@ -428,7 +397,7 @@ ParkingLotStatus::ParkingLotStatus(const cv::Mat& parkingImage, std::vector<Boun
             }
         }
 
-        */
+
     }
     cv::imshow("percentage", clone);
     cv::waitKey(0);

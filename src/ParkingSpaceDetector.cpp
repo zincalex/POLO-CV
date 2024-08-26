@@ -1,134 +1,5 @@
 #include "../include/ParkingSpaceDetector.hpp"
 
-cv::Mat ParkingSpaceDetector::createROI(const cv::Mat& input) { // We focus the analysis of the image on the parking lots
-    /*
-    cv::Mat mask = cv::Mat::zeros(input.size(), CV_8UC1);
-    cv::Mat result = cv::Mat::zeros(input.size(), input.type());
-
-    // Define ROIs
-    std::vector<cv::RotatedRect> rois;
-    rois.push_back(cv::RotatedRect(cv::Point(580, 317), cv::Size(771, 282), 58));
-    rois.push_back(cv::RotatedRect(cv::Point(950, 192), cv::Size(165, 710), 128));
-    rois.push_back(cv::RotatedRect(cv::Point(1084, 83), cv::Size(452, 54), 28));
-
-    // More ROI in order to refine the ROI selected
-    std::vector<cv::RotatedRect> black_rois;
-    black_rois.push_back(cv::RotatedRect(cv::Point(777, 343), cv::Size(1227, 125), 47));
-    black_rois.push_back(cv::RotatedRect(cv::Point(861, 30), cv::Size(1042, 72), 32));
-
-    for (const auto& roiRect : rois) {
-        cv::Point2f vertices[4];    // Using cv::Point2f, insted of cv::Point, because it enables the .points method later
-        std::vector<cv::Point> contour;
-
-        roiRect.points(vertices);    // Store the vertices of the ROI
-        for (auto vertex : vertices) { contour.push_back(vertex); }
-        cv::fillConvexPoly(mask, contour, cv::Scalar(255));
-    }
-
-    for (const auto& blackRoiRect : black_rois) {
-        cv::Point2f vertices[4];
-        std::vector<cv::Point> contour;
-
-        blackRoiRect.points(vertices);
-        for (auto vertex : vertices) { contour.push_back(vertex); }
-        cv::fillConvexPoly(mask, contour, cv::Scalar(0));
-    }
-
-    for (int y = 0; y < mask.rows; y++)
-        for (int x = 0; x < mask.cols; x++)
-            if (mask.at<uchar>(y, x) == 255)
-                result.at<cv::Vec3b>(y, x) = input.at<cv::Vec3b>(y, x);
-                */
-    return input;
-}
-
-cv::Mat ParkingSpaceDetector::gamma_correction(const cv::Mat& input, const double& gamma) {
-    cv::Mat img_float, img_gamma;
-
-    input.convertTo(img_float, CV_32F, 1.0 / 255.0);    // Convert to float and scale to [0, 1]
-    cv::pow(img_float, gamma, img_gamma);               // Gamma correction
-    img_gamma.convertTo(img_gamma, CV_8UC3, 255.0);     // Convert back to 8-bit type
-
-    return img_gamma;
-}
-
-cv::Mat ParkingSpaceDetector::saturation_thresholding(const cv::Mat& input, const unsigned int& satThreshold) {
-    cv::Mat hsv_image, saturation;
-
-    cv::cvtColor(input, hsv_image, cv::COLOR_BGR2HSV);
-    cv::extractChannel(hsv_image, saturation, 1);
-    cv::threshold(saturation, saturation, satThreshold, 255, cv::THRESH_BINARY_INV);
-
-    return saturation;
-}
-
-cv::Mat ParkingSpaceDetector::minFilter(const cv::Mat& input, const int& kernel_size) {
-    cv::Mat out(input.size(), CV_8U);
-    for(int i = 0; i < input.rows; i++) {
-        for(int j = 0; j < input.cols; j++) {
-            int min = 255;
-            int temp;
-            for(int x = -kernel_size/2; x <= kernel_size/2; x++) {
-                for(int y = -kernel_size/2; y <= kernel_size/2; y++) {
-                    if((i+x) >= 0 && (j+y) >= 0 && (i+x) < input.rows && (j + y) < input.cols) { // in case the kernel exceeds the image size
-                        temp = input.at<unsigned char> (i + x, j + y);
-                        if(temp < min)
-                            min = temp;
-                    }
-                }
-            }
-
-            for(int x = -kernel_size/2; x <= kernel_size/2; x++)
-                for(int y = -kernel_size/2; y <= kernel_size/2; y++)
-                    if((i+x) >= 0 && (j+y) >= 0 && (i+x) < input.rows && (j + y) < input.cols)
-                        out.at<unsigned char> (i+x, j+y) = min;
-        }
-    }
-    return out;
-}
-
-cv::Mat adjustContrast(const cv::Mat& inputImg, double alpha, int beta) {
-    cv::Mat newImage = cv::Mat::zeros(inputImg.size(), inputImg.type());
-
-    // Applica la regolazione di contrasto e luminosità
-    inputImg.convertTo(newImage, -1, alpha, beta);
-
-    return newImage;
-}
-
-cv::Mat morphologicalSkeleton(const cv::Mat& binaryImg) {
-    cv::Mat skeleton = cv::Mat::zeros(binaryImg.size(), CV_8UC1);
-    cv::Mat temp, eroded;
-
-    // Struttura dell'elemento (può essere rettangolare o ellittico)
-    cv::Mat element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(3, 3));
-
-    cv::Mat img = binaryImg.clone();
-
-    while (true) {
-        // Erosione
-        cv::erode(img, eroded, element);
-
-        // Apertura (erosione seguita da dilatazione)
-        cv::dilate(eroded, temp, element);
-
-        // Ottieni il segmento scheletrico corrente
-        cv::subtract(img, temp, temp);
-
-        // Aggiorna lo scheletro
-        cv::bitwise_or(skeleton, temp, skeleton);
-
-        // Aggiorna l'immagine da erodere
-        img = eroded.clone();
-
-        // Se non c'è più nulla da erodere, interrompi il ciclo
-        if (cv::countNonZero(img) == 0) {
-            break;
-        }
-    }
-
-    return skeleton;
-}
 
 // Funzione per calcolare la lunghezza della linea
 double calculateLineLength(const cv::Vec4i& line) {
@@ -152,9 +23,6 @@ double calculateAngle(const cv::Vec4i& line) {
 bool areAnglesSimilar(double angle1, double angle2, double angleThreshold = 5.0) {
     return std::abs(angle1 - angle2) < angleThreshold;
 }
-
-
-
 
 
 
@@ -246,25 +114,8 @@ std::vector<cv::Vec4i> filterDuplicateLines(std::vector<cv::Vec4i>& lines, const
                     break; // Se scartiamo la linea i, non ha senso confrontarla con altre linee
 
             }
-
-
-
-            /*
-            if (endDistance <= 20) {
-                // merge line
-                if (areAnglesSimilar(angle1, angle2, 10.0)) {
-                    std::cout << "mongus" << std::endl;
-                }
-                else { // eliminate line 2
-                    keepLine[j] = false;
-                }
-            }
-            */
-
-
         }
     }
-
 
 
     for (size_t i = 0; i < lines.size(); ++i) {
@@ -326,7 +177,7 @@ std::vector<std::pair<cv::Vec4i, cv::Vec4i>> findParallelAndCloseLines(const std
     // Declare the map using the custom comparator
 
 
-
+    // TODO make something for the palo lines
     for (size_t i = 0; i < lines.size(); ++i) {
         double angle1 = calculateAngle(lines[i]);
         cv::Point2f start1(lines[i][0], lines[i][1]);
@@ -388,10 +239,6 @@ std::vector<std::pair<cv::Vec4i, cv::Vec4i>> findParallelAndCloseLines(const std
     return matchedLines;
 }
 
-// Funzione di supporto per convertire angoli in radianti
-double deg2rad(double degrees) {
-    return degrees * CV_PI / 180.0;
-}
 
 // Funzione per disegnare la diagonale del rotated rect e creare il rotated rect
 cv::RotatedRect drawMaxDiagonalAndCreateRotatedRect(cv::Mat& image, const cv::Vec4i& line1, const cv::Vec4i& line2) {
@@ -459,6 +306,7 @@ cv::RotatedRect drawMaxDiagonalAndCreateRotatedRect(cv::Mat& image, const cv::Ve
     return rotatedRect;
 }
 
+
 cv::Vec4i standardizeLine(const cv::Vec4i& line) {
     int x1 = line[0], y1 = line[1], x2 = line[2], y2 = line[3];
 
@@ -475,8 +323,6 @@ cv::Vec4i standardizeLine(const cv::Vec4i& line) {
 
     return line;  // Se la linea è già ordinata correttamente, non fare nulla
 }
-
-
 
 
 cv::Mat ParkingSpaceDetector::maskCreation(const cv::Mat& inputImg) {
@@ -499,8 +345,8 @@ cv::Mat ParkingSpaceDetector::maskCreation(const cv::Mat& inputImg) {
 
 
 
-
-    cv::Mat roiInput = createROI(inputImg);
+    bool obscure = false;
+    cv::Mat roiInput = ImageProcessing::createROI(inputImg, obscure);
 
     // CLAHE EQUALIZATION
     std::vector<cv::Mat> bgrChannels(3);
@@ -555,7 +401,7 @@ cv::Mat ParkingSpaceDetector::maskCreation(const cv::Mat& inputImg) {
     // Otsu mask (todo USED)
     cv::Mat gray, blurred, highPass, otsuThresh;
     cvtColor(roiInput, gray, cv::COLOR_BGR2GRAY);
-    gray = adjustContrast(gray, 1, -50);
+    gray = ImageProcessing::adjustContrast(gray, 1, -50);
     GaussianBlur(gray, blurred, cv::Size(KERNEL_SIZE_GAUSSIAN_OTSU, KERNEL_SIZE_GAUSSIAN_OTSU), 0);
     subtract(gray, blurred, highPass);  // Subtract the blurred image from the original image
     threshold(highPass, otsuThresh, 0, 255, cv::THRESH_BINARY + cv::THRESH_OTSU);
@@ -564,8 +410,8 @@ cv::Mat ParkingSpaceDetector::maskCreation(const cv::Mat& inputImg) {
 
 
     // Saturation mask      (todo USED)
-    cv::Mat gc_image = gamma_correction(roiInput, GAMMA);
-    cv::Mat saturation = saturation_thresholding(gc_image, SATURATION_THRESHOLD);
+    cv::Mat gc_image = ImageProcessing::gamma_correction(roiInput, GAMMA);
+    cv::Mat saturation = ImageProcessing::saturation_thresholding(gc_image, SATURATION_THRESHOLD);
 
     // Canny mask
     cv::Mat roiCanny;
@@ -1017,6 +863,8 @@ cv::Point2f getBottomRight(const cv::RotatedRect& rect) {
     }
     return bottomRight;
 }
+
+
 void GenerateRotatedRects(std::vector<cv::RotatedRect>& rotatedRects, cv::Mat& image) {
     cv::RotatedRect rectWithMaxX, rectWithMaxY, rectWithMaxYInRange, rectWithMaxYFinal;
     bool foundMaxX = false, foundMaxY = false, foundMaxYInRange = false, foundMaxYFinal = false;
@@ -1172,7 +1020,8 @@ std::vector<cv::RotatedRect> nonMaximaSuppressionROTTTT(const std::vector<cv::Ro
     return validCandidates;
 }
 
-// TODO create class for image pre processing
+
+
 ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFramesDir) {
 
     const double RADIUS = 40.0;

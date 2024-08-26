@@ -5,6 +5,10 @@
 #include <iostream>
 #include <map>
 #include <filesystem>
+#include <optional>  // Requires C++17 or later
+#include <limits> // For std::numeric_limits
+#include <algorithm>
+#include <functional>
 #include <cmath>
 #include <opencv2/imgproc.hpp>
 #include <opencv4/opencv2/highgui.hpp>
@@ -27,10 +31,10 @@ private:
     cv::Mat gamma_correction(const cv::Mat& input, const double& gamma);
     cv::Mat saturation_thresholding(const cv::Mat& input, const unsigned int& satThreshold);
     cv::Mat minFilter(const cv::Mat& input, const int& kernel_size);
-    bool isWithinRadius(const std::pair<int, int>& center, const std::pair<int, int>& point, const double& radius);
+    bool isWithinRadius(const cv::Point& center, const cv::Point& point, const double& radius);
 
-    std::map<std::pair<int, int>, cv::Rect> nonMaximaSuppression(const std::map<std::pair<int, int>, cv::Rect>& parkingLotsBoxes, const float& iouThreshold);
-    std::vector<std::pair<cv::Point, cv::Rect>> computeAverageRect(const std::vector<std::map<std::pair<int, int>, cv::Rect>>& boundingBoxesNMS);
+    std::vector<cv::RotatedRect> nonMaximaSuppression(const std::vector<cv::RotatedRect>& parkingLotsBoxes, const float& iouThreshold);
+    std::vector<cv::RotatedRect> computeAverageRect(const std::vector<std::vector<cv::RotatedRect>>& boundingBoxesNMS);
     std::vector<cv::RotatedRect> rotateBoundingBoxes(const std::vector<std::pair<cv::Point, cv::Rect>>& rects, const float& angle);
 };
 

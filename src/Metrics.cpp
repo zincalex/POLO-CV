@@ -31,9 +31,6 @@ Metrics::Metrics(const std::vector<BoundingBox>& groundTruth, const std::vector<
     const double RADIUS = 45.0;
     const double IOU_THRESHOLD = 0.5;
 
-
-    unsigned int falseNegatives = 0;
-
     std::vector<std::vector<double>> recalls;
     std::vector<std::vector<double>> precisions;
     std::vector<double> recall_levels = {0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0};

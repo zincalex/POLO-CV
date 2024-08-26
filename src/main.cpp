@@ -53,13 +53,12 @@ int main(int argc, char** argv) {
         std::string xmlPath = xmlDirectory + "/" + xmlFilename;
 
 
-        XMLReader groundTruth = XMLReader(xmlPath);
-        cv::Mat parkingImg = cv::imread(imgPath);
-        ParkingLotStatus parkingStatus = ParkingLotStatus(parkingImg, groundTruth.getBBoxes());
+        //XMLReader groundTruth = XMLReader(xmlPath);
+        //cv::Mat parkingImg = cv::imread(imgPath);
+        //ParkingLotStatus parkingStatus = ParkingLotStatus(parkingImg, groundTruth.getBBoxes());
 
-        parkingStatus.drawParkingLotStatus();
-        cv::imshow("status", parkingStatus.getStatusImage());
-        cv::waitKey(0);
+        //parkingStatus.drawParkingLotStatus();
+        //cv::imshow("sss", parkingStatus.getStatusImage());
 
         // First Metric
 

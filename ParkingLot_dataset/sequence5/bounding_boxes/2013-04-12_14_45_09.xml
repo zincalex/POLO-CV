@@ -246,7 +246,7 @@
       <point x="394" y="65" />
     </contour>
   </space>
-  <space id="20" occupied="1">
+  <space id="20" occupied="0">
     <rotatedRect>
       <center x="393" y="55" />
       <size w="32" h="85" />

@@ -25,7 +25,7 @@
       <point x="547" y="439" />
     </contour>
   </space>
-  <space id="3" occupied="0">
+  <space id="3" occupied="1">
     <rotatedRect>
       <center x="550" y="416" />
       <size w="65" h="139" />
@@ -51,7 +51,7 @@
       <point x="446" y="304" />
     </contour>
   </space>
-  <space id="5" occupied="1">
+  <space id="5" occupied="0">
     <rotatedRect>
       <center x="462" y="288" />
       <size w="47" h="115" />

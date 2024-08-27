@@ -665,8 +665,8 @@ void removeOutliers(std::vector<cv::RotatedRect>& rotatedRects, const int& margi
                 interpolatedPointRight.y >= 0 && interpolatedPointRight.y < imgSize.height) {
 
                 // Draw yellow dots at each interpolated point
-                cv::circle(image, interpolatedPointLeft, 3, cv::Scalar(0, 255, 255), 1); // Yellow dot
-                cv::circle(image, interpolatedPointRight, 3, cv::Scalar(0, 255, 255), 1); // Yellow dot
+                //cv::circle(image, interpolatedPointLeft, 3, cv::Scalar(0, 255, 255), 1); // Yellow dot
+                //cv::circle(image, interpolatedPointRight, 3, cv::Scalar(0, 255, 255), 1); // Yellow dot
 
                 // Check if the interpolated points are in the white area on the mask
                 if (mask.at<uchar>(cv::Point(interpolatedPointLeft)) == 255) {
@@ -679,7 +679,7 @@ void removeOutliers(std::vector<cv::RotatedRect>& rotatedRects, const int& margi
             if (touchedLeft && touchedRight) {
                 outlier[i] = true;  // Mark the rectangle as an outlier
             }
-            cv::line(image, pointLeft, pointRight, cv::Scalar(0, 255, 0), 2);  // Green line with thickness 2
+            //cv::line(image, pointLeft, pointRight, cv::Scalar(0, 255, 0), 2);  // Green line with thickness 2
         }
 
 
@@ -864,108 +864,147 @@ cv::Point2f getBottomRight(const cv::RotatedRect& rect) {
     return bottomRight;
 }
 
-
 void GenerateRotatedRects(std::vector<cv::RotatedRect>& rotatedRects, cv::Mat& image) {
-    cv::RotatedRect rectWithMaxX, rectWithMaxY, rectWithMaxYInRange, rectWithMaxYFinal;
-    bool foundMaxX = false, foundMaxY = false, foundMaxYInRange = false, foundMaxYFinal = false;
-    // Max X
-    int maxXIndex = -1;
-    double maxX = -std::numeric_limits<double>::max();
+    std::vector<cv::RotatedRect> filteredY;
+    std::vector<cv::RotatedRect> filteredDegrees;
+    std::vector<cv::RotatedRect> generatingRects;
+
+    int max_X_Index = -1;
+    double maxY = -1;
+    double maxX = -1;
+
+    // Loop to filter rectangles based on certain conditions
     for (size_t i = 0; i < rotatedRects.size(); ++i) {
+        cv::Point2f bottomRight = getBottomRight(rotatedRects[i]);
+
+        // Find the rectangle with the maximum Y value
+        if (bottomRight.y > maxY) {
+            maxY = bottomRight.y;
+        }
+
+        // Find the rectangle with the maximum X value
+        if (bottomRight.x > maxX) {
+            maxX = bottomRight.x;
+            max_X_Index = i;
+        }
+
+        // Filter rectangles with angles between 0 and 50 degrees
+        double angle = rotatedRects[i].angle;
+        if (angle >= 0 && angle <= 50) {
+            filteredDegrees.push_back(rotatedRects[i]);
+        }
+
+        // Filter rectangles based on Y and X values
+        if (bottomRight.y > 460 && bottomRight.y < 520 && bottomRight.x > 750 && bottomRight.x < 860) {
+            filteredY.push_back(rotatedRects[i]);
+        }
+    }
+
+    // Remove the rectangle with the maximum Y value from the filteredY list, useful for further criterias
+    for (size_t i = 0; i < filteredY.size(); ++i) {
+        if (getBottomRight(filteredY[i]).y == maxY) {
+            filteredY.erase(filteredY.begin() + i);
+            break;
+        }
+    }
+
+    // Add the rectangle with the maximum X value to the generatingRects list if it meets the condition
+    if (maxX < 1250) {
+        generatingRects.push_back(rotatedRects[max_X_Index]);
+    }
+
+    max_X_Index = -1;
+    maxX = -1;
+
+    // Find the rectangle with the maximum X value in filteredY
+    for (size_t i = 0; i < filteredY.size(); ++i) {
         cv::Point2f bottomRight = getBottomRight(rotatedRects[i]);
         if (bottomRight.x > maxX) {
             maxX = bottomRight.x;
-            maxXIndex = i;
+            max_X_Index = i;
         }
     }
-    if (maxXIndex != -1) {
-        rectWithMaxX = rotatedRects[maxXIndex];
-        rotatedRects.erase(rotatedRects.begin() + maxXIndex);
-        foundMaxX = true;
+
+    // Rectangle with the maximum X value in filteredY
+    if (max_X_Index != -1) {
+        generatingRects.push_back(filteredY[max_X_Index]);
     }
-    // Max Y
+
+
+    double maxYValue = -1;
     int maxYIndex = -1;
-    double maxY = -std::numeric_limits<double>::max();
-    for (size_t i = 0; i < rotatedRects.size(); ++i) {
-        cv::Point2f bottomRight = getBottomRight(rotatedRects[i]);
-        if (bottomRight.y > maxY) {
-            maxY = bottomRight.y;
+    double minY_Range = image.rows + 1;
+    int minY_X_Range_Index = -1;
+
+    for (size_t i = 0; i < filteredDegrees.size(); ++i) {
+        cv::Point2f bottomRight = getBottomRight(filteredDegrees[i]);
+
+        // Find the rectangle with the maximum Y value and X > 700 with angle between 0 and 50 degree
+        if (bottomRight.x > 700 && bottomRight.y > maxYValue) {
+            maxYValue = bottomRight.y;
             maxYIndex = i;
         }
-    }
-    if (maxYIndex != -1) {
-        rectWithMaxY = rotatedRects[maxYIndex];
-        rotatedRects.erase(rotatedRects.begin() + maxYIndex);
-        foundMaxY = true;
-    }
-    // Max Y, 0-10Â°, x > 800
-    int maxYInRangeIndex = -1;
-    double maxYInRange = -std::numeric_limits<double>::max();
-    for (size_t i = 0; i < rotatedRects.size(); ++i) {
-        if (rotatedRects[i].angle >= 0 && rotatedRects[i].angle <= 10) {
-            cv::Point2f bottomRight = getBottomRight(rotatedRects[i]);
-            if (bottomRight.y > maxYInRange && bottomRight.x > 800) {
-                maxYInRange = bottomRight.y;
-                maxYInRangeIndex = i;
-            }
-        }
-    }
-    if (maxYInRangeIndex != -1) {
-        rectWithMaxYInRange = rotatedRects[maxYInRangeIndex];
-        rotatedRects.erase(rotatedRects.begin() + maxYInRangeIndex);
-        foundMaxYInRange = true;
-    }
-    // Max X in range, x > 800
-    int maxYFinalIndex = -1;
-    for (size_t i = 0; i < rotatedRects.size(); ++i) {
-        cv::Point2f bottomRight = getBottomRight(rotatedRects[i]);
-        if (bottomRight.x > 800 && bottomRight.y > 500 && bottomRight.y < 600) {
-            maxYFinalIndex = i;
-        }
-    }
-    if (maxYFinalIndex != -1) {
-        rectWithMaxYFinal = rotatedRects[maxYFinalIndex];
-        foundMaxYFinal = true;
-    }
-    std::vector<cv::RotatedRect> selectedRects;
-    if (foundMaxX) selectedRects.push_back(rectWithMaxX);
-    if (foundMaxYInRange) selectedRects.push_back(rectWithMaxYInRange);
-    if (foundMaxYFinal) selectedRects.push_back(rectWithMaxYFinal);
-    std::vector<cv::RotatedRect> generatedRects;
-    for (const auto& rect : selectedRects) {
-        cv::Point2f vertices[4];
-        rect.points(vertices);
-        cv::Point2f midPointLongSide = (cv::norm(vertices[0] - vertices[1]) > cv::norm(vertices[1] - vertices[2]))
-                                       ? (vertices[0] + vertices[1]) * 0.5
-                                       : (vertices[1] + vertices[2]) * 0.5;
-        cv::Point2f newCenter = rect.center + (getBottomRight(rect) - midPointLongSide);
-        cv::RotatedRect newRect(newCenter, rect.size, rect.angle);
-        //Check if the corner is outside the image
-        cv::Point2f newVertices[4];
-        newRect.points(newVertices);
-        for (auto& vertex : newVertices) {
-            vertex.x = std::clamp(vertex.x, 0.0f, static_cast<float>(image.cols - 1));
-            vertex.y = std::clamp(vertex.y, 0.0f, static_cast<float>(image.rows - 1));
-        }
-        newRect = cv::minAreaRect(std::vector<cv::Point2f>(newVertices, newVertices + 4));
-        generatedRects.push_back(newRect);
-    }
-    // Re-Insert rect
-    if (foundMaxX) rotatedRects.push_back(rectWithMaxX);
-    if (foundMaxY) rotatedRects.push_back(rectWithMaxY);
-    if (foundMaxYInRange) rotatedRects.push_back(rectWithMaxYInRange);
-    if (foundMaxYFinal) rotatedRects.push_back(rectWithMaxYFinal);
-    rotatedRects.insert(rotatedRects.end(), generatedRects.begin(), generatedRects.end());
 
-    /*
-    for (const auto& rect : generatedRects) {
-        cv::Point2f vertices[4];
-        rect.points(vertices);
-        for (int i = 0; i < 4; ++i) {
-            cv::line(image, vertices[i], vertices[(i + 1) % 4], cv::Scalar(0, 255, 255), 2);  // Disegna in giallo
+        // Find the rectangle with the minimum Y value and X within a specific range with angle between 0 and 50 degree
+        if (bottomRight.y < minY_Range && bottomRight.x >= 685 && bottomRight.x <= 750) {
+            minY_Range = bottomRight.x;
+            minY_X_Range_Index = i;
         }
     }
-     */
+
+    // Adds two "vertical" rectangles
+    if (maxYIndex != -1 && minY_Range > 705) {
+        generatingRects.push_back(filteredDegrees[maxYIndex]);
+    }
+    if (minY_X_Range_Index != -1) {
+        generatingRects.push_back(filteredDegrees[minY_X_Range_Index]);
+    }
+    // generate new rotated rectangles
+    for (const auto &rect: generatingRects) {
+        cv::Point2f vertices[4];
+        rect.points(vertices);
+
+        // bottom-right Y value is less than 200
+        cv::Point2f bottomRight = getBottomRight(rect);
+        if (bottomRight.y < 200) {
+            // Calculate the translation to align the opposite side
+            cv::Point2f midPointLongSide = (vertices[0] + vertices[1]) * 0.5;
+            cv::Point2f translation = bottomRight - midPointLongSide;
+            cv::Point2f newCenter = rect.center - translation;
+            translation.x -= cv::norm(vertices[0] - bottomRight) / 1.1;
+            translation.y -= cv::norm(vertices[1] - vertices[2]) / 2;
+            newCenter += translation;
+
+            cv::RotatedRect newRect(newCenter, rect.size, rect.angle);
+
+            rotatedRects.push_back(newRect);
+        } else {
+            // Y >= 200,
+            cv::Point2f midPointLongSide = (vertices[0] + vertices[1]) * 0.5;
+            cv::Point2f translation = bottomRight - midPointLongSide;
+            cv::Point2f newCenter = rect.center + translation;
+
+            // Create the new rotated rectangle with the same angle and size
+            cv::RotatedRect newRect(newCenter, rect.size, rect.angle);
+
+            // Check if any side is greater than 90 and resize if needed
+            if (newRect.center.x > 1150) {
+                if (newRect.size.width > 110) {
+                    newRect.size.width *= 0.55;
+                }
+                if (newRect.size.height > 110) {
+                    newRect.size.height *= 0.55;
+                }
+                // After resizing, align vertex 0 with the midpoint of the side it was projected onto
+                newRect.points(vertices);
+                cv::Point2f newMidPointLongSide = (vertices[0] + vertices[1]) * 0.5;
+                translation = newMidPointLongSide - vertices[0];
+                newCenter = newRect.center - translation;
+                newRect = cv::RotatedRect(newCenter, newRect.size, newRect.angle);
+            }
+            rotatedRects.push_back(newRect);
+        }
+    }
 }
 
 
@@ -1070,15 +1109,15 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
         std::vector<std::pair<cv::Vec4i, cv::Vec4i>> parallelLines = findParallelAndCloseLines(filteredLines, clone, max_init_distance, maxParallel_angle);
 
         std::vector<cv::RotatedRect> rotatedRects = linesToRotatedRect(parallelLines);
-        GenerateRotatedRects(rotatedRects, clone3);
+        GenerateRotatedRects(rotatedRects, clone);
         //drawRotatedRects(clone, rotatedRects);
         //cv::imshow("before", clone);
         //cv::waitKey(0);
 
-        removeOutliers(rotatedRects, 90, imgSize, clone3);
-        drawRotatedRects(clone3, rotatedRects);
+        removeOutliers(rotatedRects, 90, imgSize, clone);
+        drawRotatedRects(clone, rotatedRects);
 
-        cv::imshow("Rotated Rectangles", clone3);
+        cv::imshow("Rotated Rectangles", clone);
         cv::waitKey(0);
 
 

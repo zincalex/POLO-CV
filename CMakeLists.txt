@@ -10,6 +10,11 @@ add_library(ImgProcessing
         src/ImageProcessing.cpp
 )
 
+add_library(Graphics
+        include/Graphics.hpp
+        src/Graphics.cpp
+)
+
 add_library(BBox
         include/BoundingBox.hpp
         src/BoundingBox.cpp

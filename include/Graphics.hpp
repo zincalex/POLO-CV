@@ -1,12 +1,8 @@
-//
-// Created by trigger on 8/27/24.
-//
+#ifndef GRAPHICS_HPP
+#define GRAPHICS_HPP
 
-#ifndef MAIN_GRAPHICS_HPP
-#define MAIN_GRAPHICS_HPP
-
-#include "algorithm"
-#include "set"
+#include <algorithm>
+#include <set>
 #include <opencv2/imgproc.hpp>
 
 class Graphics {
@@ -23,4 +19,4 @@ private:
 };
 
 
-#endif //MAIN_GRAPHICS_HPP
+#endif

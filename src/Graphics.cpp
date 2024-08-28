@@ -1,7 +1,3 @@
-//
-// Created by trigger on 8/27/24.
-//
-
 #include "../include/Graphics.hpp"
 
 void Graphics::getParkingRow(std::vector<cv::RotatedRect> &parkingSlots, int numParking, float angle, int xOffset,
@@ -37,6 +33,7 @@ void Graphics::getParkingRow(std::vector<cv::RotatedRect> &parkingSlots, int num
         }
     }
 }
+
 
 std::vector<cv::RotatedRect> Graphics::getBoxes() {
     std::vector<cv::RotatedRect> rectangles;
@@ -88,6 +85,7 @@ std::vector<cv::RotatedRect> Graphics::getBoxes() {
     return rectangles;
 }
 
+
 cv::Mat Graphics::drawMap(const std::vector<cv::RotatedRect> &parkingSpaces) {
     //define dimensions of original map and create a matrix with white background
     int width = 900;
@@ -108,6 +106,7 @@ cv::Mat Graphics::drawMap(const std::vector<cv::RotatedRect> &parkingSpaces) {
     return parkingMap;
 }
 
+
 void Graphics::fillRotatedRectsWithCar(cv::Mat &image, const std::vector<cv::RotatedRect> &rectangles,
                                        const std::vector<int> &carIndices) {
     for (size_t i = 0; i < rectangles.size(); ++i) {
@@ -127,6 +126,7 @@ void Graphics::fillRotatedRectsWithCar(cv::Mat &image, const std::vector<cv::Rot
         cv::fillPoly(image, fillPoints, color);
     }
 }
+
 
 void Graphics::mapOverlay(cv::Mat &src, cv::Mat map) {
     // Create a local copy of the map to modify without changing the original

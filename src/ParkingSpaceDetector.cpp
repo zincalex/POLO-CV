@@ -28,6 +28,30 @@ bool ParkingSpaceDetector::isInRange(const double& angle, const std::pair<double
 }
 
 
+bool ParkingSpaceDetector::isWithinRadius(const cv::Point& center, const cv::Point& point, const double& radius) const {
+    return std::sqrt(std::pow(center.x - point.x, 2) + std::pow(center.y - point.y, 2)) <= radius;
+}
+
+
+cv::Point2f ParkingSpaceDetector::getBottomRight(const cv::RotatedRect& rect) const {
+    cv::Point2f vertices[4];
+    rect.points(vertices);
+    cv::Point2f bottomRight = vertices[0];
+    double maxSum = bottomRight.x + bottomRight.y;
+
+    // The bottom right corner has the highest sum of the x and y coordinate
+    for (unsigned int i = 1; i < 4; ++i) {
+        double sum = vertices[i].x + vertices[i].y;
+        if (sum > maxSum) {
+            maxSum = sum;
+            bottomRight = vertices[i];
+        }
+    }
+
+    return bottomRight;
+}
+
+
 cv::Vec4i ParkingSpaceDetector::standardizeLine(const cv::Vec4i& line) const {
     int x1 = line[0], y1 = line[1], x2 = line[2], y2 = line[3];
 
@@ -44,7 +68,7 @@ cv::Vec4i ParkingSpaceDetector::standardizeLine(const cv::Vec4i& line) const {
 
 
 std::vector<cv::Vec4i> ParkingSpaceDetector::filterLines(std::vector<cv::Vec4i>& lines, const cv::Mat& referenceImage, const std::vector<std::pair<double, double>>& parkingSpaceLinesAngles,
-                                                         const double& proximityThreshold1, const double& proximityThreshold2, const double& minLength,
+                                                         const std::vector<double>& proximityThresholds, const double& minLength,
                                                          const double& angleThreshold, const double& whitenessThreshold) const {
 
     const std::pair<double, double> FIRST_ANGLE_RANGE = parkingSpaceLinesAngles[0];
@@ -123,7 +147,7 @@ std::vector<cv::Vec4i> ParkingSpaceDetector::filterLines(std::vector<cv::Vec4i>&
 
 
             // 4 CONTROL : lines that start very close and end very close, with the same angle
-            if ((startDistance < proximityThreshold1 || endDistance < proximityThreshold1) && areAnglesSimilar(angle1, angle2, angleThreshold)) {
+            if ((startDistance < proximityThresholds[0] || endDistance < proximityThresholds[0]) && areAnglesSimilar(angle1, angle2, angleThreshold)) {
                 keepLine[length1 >= length2 ? j : i] = false; // Keep the longest line
                 if (length1 < length2)
                     break; // If we reject line i, it does not make sense to keep comparing
@@ -150,7 +174,7 @@ std::vector<cv::Vec4i> ParkingSpaceDetector::filterLines(std::vector<cv::Vec4i>&
 
 
             // 5 CONTROL : if end and start are close and angle is not similar discard it
-            if ((startDistance <= proximityThreshold2 || endDistance <= proximityThreshold2) && !areAnglesSimilar(angle1, angle2, angleThreshold)) {
+            if ((startDistance <= proximityThresholds[1] || endDistance <= proximityThresholds[1]) && !areAnglesSimilar(angle1, angle2, angleThreshold)) {
                 isInRange(angle1, SECOND_ANGLE_RANGE) ? keepLine[j] = false : keepLine[i] = false;
                 break;
             }
@@ -180,6 +204,7 @@ std::vector<std::pair<cv::Vec4i, cv::Vec4i>> ParkingSpaceDetector::matchLines(co
     const std::pair<double, double> SECOND_ANGLE_RANGE = parkingSpaceLinesAngles[1];
     std::vector<std::pair<cv::Vec4i, cv::Vec4i>> matchedLines;
 
+    /*cv::Mat image = imageSi.clone();*/
     for (unsigned int i = 0; i < lines.size(); ++i) {
         double angle1 = calculateLineAngle(lines[i]);
         cv::Point2f start1(lines[i][0], lines[i][1]);
@@ -216,8 +241,8 @@ std::vector<std::pair<cv::Vec4i, cv::Vec4i>> ParkingSpaceDetector::matchLines(co
             }
         }
         /*cv::imshow("progress", image);
-        cv::waitKey(0);*/
-
+        cv::waitKey(0);
+        image = imageSi.clone();*/
         if (bestCandidate.has_value())
             matchedLines.push_back(std::make_pair(lines[i], bestCandidate.value()));
     }
@@ -277,257 +302,8 @@ std::vector<cv::RotatedRect> ParkingSpaceDetector::linesToRotatedRect(const std:
     return rotatedRectCandidates;
 }
 
-
-
-void ParkingSpaceDetector::removeOutliers(std::vector<cv::RotatedRect>& rotatedRects, std::vector<std::pair<double, double>>& parkingSpaceLinesAngles,
-                                          const cv::Size& imgSize, const int& margin, const std::vector<double>& aspectRatioThresholds) const {
-
-    const std::pair<double, double> FIRST_ANGLE_RANGE = parkingSpaceLinesAngles[0];
-    std::vector<bool> outlier(rotatedRects.size(), false);
-
-    // Create the mask to see where the rotated rectangle are
-    cv::Mat mask = cv::Mat::zeros(imgSize, CV_8UC1);
-    for (const cv::RotatedRect& rect : rotatedRects) {
-        cv::Point2f vertices[4];
-        rect.points(vertices);
-
-        std::vector<cv::Point> verticesVector(4);
-        for (unsigned int j = 0; j < 4; j++)
-            verticesVector[j] = vertices[j];
-        cv::fillPoly(mask, verticesVector, cv::Scalar(255));
-    }
-
-
-    // OUTLIER ELIMINATION
-    // First outliers : parking spaces detected between other parking spaces
-    for (unsigned int i = 0; i < rotatedRects.size(); ++i) {
-        cv::Point2f vertices[4];
-        rotatedRects[i].points(vertices);
-
-        // Calculate the midpoints of the left and right sides
-        cv::Point2f midpointLeft = (vertices[0] + vertices[3]) * 0.5;
-        cv::Point2f midpointRight = (vertices[1] + vertices[2]) * 0.5;
-
-        // Calculate the direction vectors (perpendicular to the rectangle's orientation)
-        cv::Point2f direction = midpointRight - midpointLeft;
-        direction = direction / cv::norm(direction);  // Normalize the direction vector
-
-        // Calculate the endpoints for the lines
-        cv::Point2f pointLeft = midpointLeft - margin * direction;
-        cv::Point2f pointRight = midpointRight + margin * direction;
-
-        // Remove rectangles that are between 2 parking spaces
-        bool touchedLeft = false;
-        bool touchedRight = false;
-        int numSteps = 50; // Number of points to check along the line
-        for (unsigned int step = 1; step <= numSteps; ++step) {
-            double alpha = static_cast<double>(step) / numSteps;
-            cv::Point2f interpolatedPointLeft = midpointLeft * (1.0f - alpha) + pointLeft * alpha;
-            cv::Point2f interpolatedPointRight = midpointRight * (1.0f - alpha) + pointRight * alpha;
-
-            // Ensure that the points are within the image boundaries
-            if (interpolatedPointLeft.x >= 0 && interpolatedPointLeft.x < imgSize.width &&
-                interpolatedPointLeft.y >= 0 && interpolatedPointLeft.y < imgSize.height &&
-                interpolatedPointRight.x >= 0 && interpolatedPointRight.x < imgSize.width &&
-                interpolatedPointRight.y >= 0 && interpolatedPointRight.y < imgSize.height) {
-
-                // Draw yellow dots at each interpolated point, IMPORT THE IMAGE FOR REPORT FOR PRINTING
-                //cv::circle(image, interpolatedPointLeft, 3, cv::Scalar(0, 255, 255), 1); // Yellow dot
-                //cv::circle(image, interpolatedPointRight, 3, cv::Scalar(0, 255, 255), 1); // Yellow dot
-
-                // Check if the interpolated points are in the white area on the mask
-                if (mask.at<uchar>(cv::Point(interpolatedPointLeft)) == 255)
-                    touchedLeft = true;
-
-                if (mask.at<uchar>(cv::Point(interpolatedPointRight)) == 255)
-                    touchedRight = true;
-            }
-
-            if (touchedLeft && touchedRight)
-                outlier[i] = true;  // Mark the rectangle as an outlier
-            //cv::line(image, pointLeft, pointRight, cv::Scalar(0, 255, 0), 2);  // Green line with thickness 2
-        }
-
-
-        // Second outliers : rotated rects with a specific angles that differ to much from the other types
-        double angle = rotatedRects[i].angle - 90;
-        double width = rotatedRects[i].size.width;
-        double height = rotatedRects[i].size.height;
-        double aspectRatio = std::max(width, height) / std::min(width, height);
-
-        // Depending on the angle different aspect ratio are checked
-        if (isInRange(angle, FIRST_ANGLE_RANGE)) {
-            if (aspectRatio < aspectRatioThresholds[0]) {
-                outlier[i] = true;
-            }
-        }
-        else {
-            if (aspectRatio > aspectRatioThresholds[1])
-                outlier[i] = true;
-        }
-    }
-
-
-    // Third outliers: remove overlapping rotated rects
-    for (unsigned int i = 0; i < rotatedRects.size(); ++i) {    // We need the rects to be filtered, if this operation is done in the previous for loop returns we achive different (worse) results
-        if (outlier[i]) continue;
-
-        for (unsigned int j = i + 1; j < rotatedRects.size(); ++j) {
-            if (outlier[j]) continue;
-
-            int smallRectIndex = i;
-            int largeRectIndex = j;
-            if (rotatedRects[i].size.area() > rotatedRects[j].size.area()) {
-                smallRectIndex = j;
-                largeRectIndex = i;
-            }
-
-            // Find intersection points between the two rectangles
-            std::vector<cv::Point2f> intersectionPoints;
-            int result = cv::rotatedRectangleIntersection(rotatedRects[smallRectIndex], rotatedRects[largeRectIndex], intersectionPoints);
-
-            if (result == cv::INTERSECT_FULL || result == cv::INTERSECT_PARTIAL) {
-                // Calculate the intersection area (Polygon area)
-                double intersectionArea = cv::contourArea(intersectionPoints);
-
-                // Compare with the smaller rectangle's area
-                double smallRectArea = rotatedRects[smallRectIndex].size.area();
-
-                // If intersection area is close to the smaller rectangle's area, keep the smaller rectangle
-                if ((intersectionArea / smallRectArea) > 0.8)
-                    outlier[largeRectIndex] = true;
-            }
-        }
-    }
-
-    auto it = std::remove_if(rotatedRects.begin(), rotatedRects.end(),[&](const cv::RotatedRect& rect) {
-        unsigned int index = &rect - &rotatedRects[0];
-        return outlier[index];
-    });
-    rotatedRects.erase(it, rotatedRects.end());
-}
-
-
-
-
-void drawRotatedRects(cv::Mat& image, const std::vector<cv::RotatedRect>& rotatedRects) {
-    // Define the color for the border (Red)
-    cv::Scalar redColor(0, 0, 255);  // BGR format, so (0, 0, 255) is red
-
-    for (const cv::RotatedRect& rect : rotatedRects) {
-        // Get the 4 vertices of the rotated rectangle
-        cv::Point2f vertices[4];
-        rect.points(vertices);
-
-        // Convert the vertices to integer points (required by polylines)
-        std::vector<cv::Point> intVertices(4);
-        for (int i = 0; i < 4; i++) {
-            intVertices[i] = vertices[i];
-        }
-
-        // Draw the rectangle with a red border
-        cv::polylines(image, intVertices, true, redColor, 2);  // Thickness of 2
-    }
-}
-
-
-bool ParkingSpaceDetector::isWithinRadius(const cv::Point& center, const cv::Point& point, const double& radius) const {
-    double distance = std::sqrt(std::pow(center.x - point.x, 2) + std::pow(center.y - point.y, 2));
-    return distance <= radius;
-}
-
-std::vector<cv::RotatedRect> ParkingSpaceDetector::nonMaximaSuppression(const std::vector<cv::RotatedRect>& parkingLotsBoxes, const float& iouThreshold) {
-    if (parkingLotsBoxes.size() == 1) return {parkingLotsBoxes}; // Only one candidate, hence my only bounding box
-
-    std::vector<cv::Rect> rects;
-    std::vector<int> indices;
-
-
-    for (const auto& entry : parkingLotsBoxes) {   // entry = (center, rect)
-        rects.push_back(entry.boundingRect());
-    }
-
-    // Despite being inside the deep neural network library, the function does NOT use deep learning
-    cv::dnn::NMSBoxes(rects, std::vector<float>(rects.size(), 1.0f), 0.0f, iouThreshold, indices);
-
-    // Populate the map
-    std::vector<cv::RotatedRect> validCandidates;
-    for (const int& idx : indices)
-        validCandidates.push_back(parkingLotsBoxes[idx]);
-
-    return validCandidates;
-}
-
-std::vector<cv::RotatedRect> ParkingSpaceDetector::computeAverageRect(const std::vector<std::vector<cv::RotatedRect>>& boundingBoxesNMS) {
-    std::vector<cv::RotatedRect> averages;
-
-    for (const std::vector<cv::RotatedRect>& parkingSpace : boundingBoxesNMS) {
-        unsigned int sumXCenter = 0, sumYCenter = 0;
-        unsigned int sumWidth = 0, sumHeight = 0;
-        unsigned int sumAngles = 0;
-        unsigned int count = parkingSpace.size();
-        float avgAngleSin = 0.0f;
-        float avgAngleCos = 0.0f;
-
-        for (const cv::RotatedRect& box : parkingSpace) {
-            sumXCenter += box.center.x;
-            sumYCenter += box.center.y;
-            sumWidth += box.size.width;
-            sumHeight += box.size.height;
-
-            //sumAngles += box.angle;
-
-            float angleRad = box.angle * CV_PI / 180.0f;
-            avgAngleSin += std::sin(angleRad);
-            avgAngleCos += std::cos(angleRad);
-        }
-
-        cv::Point avgCenter(static_cast<int>(sumXCenter / count), static_cast<int>(sumYCenter / count));
-        cv::Size avgSize = cv::Size(static_cast<int>(sumWidth / count), static_cast<int>(sumHeight / count));
-
-
-        //double avgAngle = sumAngles / count;
-        // Calculate the average angle in radians
-        float avgAngleRad = std::atan2(avgAngleSin / count, avgAngleCos / count);
-        // Convert the average angle back to degrees
-        float avgAngle = avgAngleRad * 180.0f / CV_PI;
-
-
-        cv::RotatedRect avgRotRect (avgCenter, avgSize, avgAngle);
-        averages.push_back(avgRotRect);
-    }
-    return averages;
-}
-
-std::vector<cv::RotatedRect> ParkingSpaceDetector::rotateBoundingBoxes(const std::vector<std::pair<cv::Point, cv::Rect>>& rects, const float& angle) {
-    std::vector<cv::RotatedRect> rotatedBBoxes;
-    for (const auto& pair : rects) {
-        cv::Point center = pair.first;
-        cv::Rect rect = pair.second;
-
-        cv::Size size(rect.width, rect.height);
-        cv::RotatedRect rotatedBBox(center, size, angle);
-        rotatedBBoxes.push_back(rotatedBBox);
-    }
-    return rotatedBBoxes;
-}
-
-cv::Point2f getBottomRight(const cv::RotatedRect& rect) {
-    cv::Point2f vertices[4];
-    rect.points(vertices);
-    cv::Point2f bottomRight = vertices[0];
-    double maxSum = bottomRight.x + bottomRight.y;
-    for (int i = 1; i < 4; i++) {
-        double sum = vertices[i].x + vertices[i].y;
-        if (sum > maxSum) {
-            maxSum = sum;
-            bottomRight = vertices[i];
-        }
-    }
-    return bottomRight;
-}
-
-void GenerateRotatedRects(std::vector<cv::RotatedRect>& rotatedRects, cv::Mat& image) {
+// TODO finist
+void ParkingSpaceDetector::GenerateRotatedRects(std::vector<cv::RotatedRect>& rotatedRects) const {
     std::vector<cv::RotatedRect> filteredY;
     std::vector<cv::RotatedRect> filteredDegrees;
     std::vector<cv::RotatedRect> generatingRects;
@@ -596,8 +372,8 @@ void GenerateRotatedRects(std::vector<cv::RotatedRect>& rotatedRects, cv::Mat& i
 
     double maxYValue = -1;
     int maxYIndex = -1;
-    double minY_Range = image.rows + 1;
     int minY_X_Range_Index = -1;
+    double minY_Range = std::numeric_limits<double>::max();
 
     for (size_t i = 0; i < filteredDegrees.size(); ++i) {
         cv::Point2f bottomRight = getBottomRight(filteredDegrees[i]);
@@ -670,87 +446,225 @@ void GenerateRotatedRects(std::vector<cv::RotatedRect>& rotatedRects, cv::Mat& i
     }
 }
 
-float computeIoU(const cv::RotatedRect& rect1, const cv::RotatedRect& rect2) {
-    // Find the intersection points between the two rotated rectangles
-    std::vector<cv::Point2f> intersectionPoints;
-    cv::rotatedRectangleIntersection(rect1, rect2, intersectionPoints);
 
-    if (intersectionPoints.size() <= 0)
-        return 0.0f;
+void ParkingSpaceDetector::removeOutliers(std::vector<cv::RotatedRect>& rotatedRects, const std::vector<std::pair<double, double>>& parkingSpaceLinesAngles,
+                                          const cv::Size& imgSize, const int& margin, const std::vector<double>& aspectRatioThresholds) const {
 
-    // Compute the area of the intersection polygon
-    float intersectionArea = cv::contourArea(intersectionPoints);
+    const std::pair<double, double> FIRST_ANGLE_RANGE = parkingSpaceLinesAngles[0];
+    std::vector<bool> outlier(rotatedRects.size(), false);
 
-    // Calculate the area of both rectangles
-    float rect1Area = rect1.size.area();
-    float rect2Area = rect2.size.area();
+    // Create the mask to see where the rotated rectangle are
+    cv::Mat mask = cv::Mat::zeros(imgSize, CV_8UC1);
+    for (const cv::RotatedRect& rect : rotatedRects) {
+        cv::Point2f vertices[4];
+        rect.points(vertices);
 
-    // Compute the IoU (Intersection over Union)
-    float iou = intersectionArea / (rect1Area + rect2Area - intersectionArea);
-    return iou;
-}
+        std::vector<cv::Point> verticesVector(4);
+        for (unsigned int j = 0; j < 4; j++)
+            verticesVector[j] = vertices[j];
+        cv::fillPoly(mask, verticesVector, cv::Scalar(255));
+    }
 
-std::vector<cv::RotatedRect> nonMaximaSuppressionROTTTT(const std::vector<cv::RotatedRect>& parkingLotsBoxes, const float& iouThreshold) {
-    if (parkingLotsBoxes.size() == 1) return {parkingLotsBoxes};
 
-    std::vector<cv::RotatedRect> validCandidates;
-    std::vector<bool> suppress(parkingLotsBoxes.size(), false);
+    // OUTLIER ELIMINATION
+    // First outliers : parking spaces detected between other parking spaces
+    for (unsigned int i = 0; i < rotatedRects.size(); ++i) {
+        cv::Point2f vertices[4];
+        rotatedRects[i].points(vertices);
 
-    // Apply Non-Maxima Suppression
-    for (size_t i = 0; i < parkingLotsBoxes.size(); ++i) {
-        if (suppress[i]) continue;
+        // Calculate the midpoints of the left and right sides
+        cv::Point2f midpointLeft = (vertices[0] + vertices[3]) * 0.5;
+        cv::Point2f midpointRight = (vertices[1] + vertices[2]) * 0.5;
 
-        // Keep this rectangle
-        validCandidates.push_back(parkingLotsBoxes[i]);
+        // Calculate the direction vectors (perpendicular to the rectangle's orientation)
+        cv::Point2f direction = midpointRight - midpointLeft;
+        direction = direction / cv::norm(direction);  // Normalize the direction vector
 
-        for (size_t j = i + 1; j < parkingLotsBoxes.size(); ++j) {
-            if (suppress[j]) continue;
+        // Calculate the endpoints for the lines
+        cv::Point2f pointLeft = midpointLeft - margin * direction;
+        cv::Point2f pointRight = midpointRight + margin * direction;
 
-            // Compute IoU between the current rectangle and the other ones
-            float iou = computeIoU(parkingLotsBoxes[i], parkingLotsBoxes[j]);
+        // Remove rectangles that are between 2 parking spaces
+        bool touchedLeft = false;
+        bool touchedRight = false;
+        int numSteps = 50; // Number of points to check along the line
+        for (unsigned int step = 1; step <= numSteps; ++step) {
+            double alpha = static_cast<double>(step) / numSteps;
+            cv::Point2f interpolatedPointLeft = midpointLeft * (1.0f - alpha) + pointLeft * alpha;
+            cv::Point2f interpolatedPointRight = midpointRight * (1.0f - alpha) + pointRight * alpha;
 
-            // Suppress the rectangle if IoU is greater than the threshold
-            if (iou < iouThreshold) {
-                suppress[j] = true;
+            // Ensure that the points are within the image boundaries
+            if (interpolatedPointLeft.x >= 0 && interpolatedPointLeft.x < imgSize.width &&
+                interpolatedPointLeft.y >= 0 && interpolatedPointLeft.y < imgSize.height &&
+                interpolatedPointRight.x >= 0 && interpolatedPointRight.x < imgSize.width &&
+                interpolatedPointRight.y >= 0 && interpolatedPointRight.y < imgSize.height) {
+
+                // Draw yellow dots at each interpolated point, IMPORT THE IMAGE FOR REPORT FOR PRINTING
+                /*cv::circle(image, interpolatedPointLeft, 3, cv::Scalar(0, 255, 255), 1); // Yellow dot
+                cv::circle(image, interpolatedPointRight, 3, cv::Scalar(0, 255, 255), 1); // Yellow dot*/
+
+                // Check if the interpolated points are in the white area on the mask
+                if (mask.at<uchar>(cv::Point(interpolatedPointLeft)) == 255)
+                    touchedLeft = true;
+
+                if (mask.at<uchar>(cv::Point(interpolatedPointRight)) == 255)
+                    touchedRight = true;
+            }
+
+            if (touchedLeft && touchedRight)
+                outlier[i] = true;  // Mark the rectangle as an outlier
+            /*cv::line(image, pointLeft, pointRight, cv::Scalar(0, 255, 0), 2);  // Green line with thickness 2*/
+        }
+
+
+        // Second outliers : rotated rects with a specific angles that differ to much from the other types
+        double angle = rotatedRects[i].angle - 90;
+        double width = rotatedRects[i].size.width;
+        double height = rotatedRects[i].size.height;
+        double aspectRatio = std::max(width, height) / std::min(width, height);
+
+        // Depending on the angle different aspect ratio are checked
+        if (isInRange(angle, FIRST_ANGLE_RANGE)) {
+            if (aspectRatio < aspectRatioThresholds[0]) {
+                outlier[i] = true;
+            }
+        }
+        else {
+            if (aspectRatio > aspectRatioThresholds[1])
+                outlier[i] = true;
+        }
+    }
+
+
+    // Third outliers: remove overlapping rotated rects
+    for (unsigned int i = 0; i < rotatedRects.size(); ++i) {    // We need the rects to be filtered, if this operation is done in the previous for loop returns we achive different (worse) results
+        if (outlier[i]) continue;
+
+        for (unsigned int j = i + 1; j < rotatedRects.size(); ++j) {
+            if (outlier[j]) continue;
+
+            int smallRectIndex = i;
+            int largeRectIndex = j;
+            if (rotatedRects[i].size.area() > rotatedRects[j].size.area()) {
+                smallRectIndex = j;
+                largeRectIndex = i;
+            }
+
+            // Find intersection points between the two rectangles
+            std::vector<cv::Point2f> intersectionPoints;
+            int result = cv::rotatedRectangleIntersection(rotatedRects[smallRectIndex], rotatedRects[largeRectIndex], intersectionPoints);
+
+            if (result == cv::INTERSECT_FULL || result == cv::INTERSECT_PARTIAL) {
+                // Calculate the intersection area (Polygon area)
+                double intersectionArea = cv::contourArea(intersectionPoints);
+
+                // Compare with the smaller rectangle's area
+                double smallRectArea = rotatedRects[smallRectIndex].size.area();
+
+                // If intersection area is close to the smaller rectangle's area, keep the smaller rectangle
+                if ((intersectionArea / smallRectArea) > 0.8)
+                    outlier[largeRectIndex] = true;
             }
         }
     }
 
-    return validCandidates;
+    auto it = std::remove_if(rotatedRects.begin(), rotatedRects.end(),[&](const cv::RotatedRect& rect) {
+        unsigned int index = &rect - &rotatedRects[0];
+        return outlier[index];
+    });
+    rotatedRects.erase(it, rotatedRects.end());
+}
+
+
+std::vector<cv::RotatedRect> ParkingSpaceDetector::computeAverageRect(const std::vector<std::vector<cv::RotatedRect>>& boundingBoxesParkingSpaces) {
+
+    std::vector<cv::RotatedRect> averages;
+    for (const std::vector<cv::RotatedRect>& parkingSpace : boundingBoxesParkingSpaces) {
+        unsigned int sumXCenter = 0, sumYCenter = 0;
+        unsigned int sumWidth = 0, sumHeight = 0;
+        unsigned int sumAngles = 0;
+        unsigned int count = parkingSpace.size();
+        double avgAngleSin = 0.0;
+        double avgAngleCos = 0.0;
+
+        for (const cv::RotatedRect& box : parkingSpace) {
+            sumXCenter += box.center.x;
+            sumYCenter += box.center.y;
+            sumWidth += box.size.width;
+            sumHeight += box.size.height;
+
+            double angleRad = box.angle * CV_PI / 180.0;
+            avgAngleSin += std::sin(angleRad);
+            avgAngleCos += std::cos(angleRad);
+        }
+
+        cv::Point avgCenter(static_cast<int>(sumXCenter / count), static_cast<int>(sumYCenter / count));
+        cv::Size avgSize = cv::Size(static_cast<int>(sumWidth / count), static_cast<int>(sumHeight / count));
+
+        double avgAngleRad = std::atan2(avgAngleSin / count, avgAngleCos / count);
+        double avgAngle = avgAngleRad * 180.0f / CV_PI;                                     // back to degree
+
+        cv::RotatedRect avgRotRect (avgCenter, avgSize, avgAngle);
+        averages.push_back(avgRotRect);
+    }
+
+    return averages;
 }
 
 
 
+// TODO eliminate
+void drawRotatedRects(cv::Mat& image, const std::vector<cv::RotatedRect>& rotatedRects) {
+    // Define the color for the border (Red)
+    cv::Scalar redColor(0, 0, 255);  // BGR format, so (0, 0, 255) is red
+
+    for (const cv::RotatedRect& rect : rotatedRects) {
+        // Get the 4 vertices of the rotated rectangle
+        cv::Point2f vertices[4];
+        rect.points(vertices);
+
+        // Convert the vertices to integer points (required by polylines)
+        std::vector<cv::Point> intVertices(4);
+        for (int i = 0; i < 4; i++) {
+            intVertices[i] = vertices[i];
+        }
+
+        // Draw the rectangle with a red border
+        cv::polylines(image, intVertices, true, redColor, 2);  // Thickness of 2
+    }
+}
+
+
+
+
+
 ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFramesDir) {
-    const std::pair<double, double> FIRST_ANGLE_RANGE = std::make_pair(5.0, 20.0);
-    const std::pair<double, double> SECOND_ANGLE_RANGE = std::make_pair(-87, -55.0);
+    // PARAMETERS
+    // Main angle ranges of the parking lines (can be adjusted accordingly)
+    const std::vector<std::pair<double, double>> PARKING_SPACE_LINES_ANGLES = {std::make_pair(5.0, 20.0), std::make_pair(-87, -55.0)};
 
-    const double RADIUS = 40.0;
+    // Line filter parameters
+    const std::vector<double> PROXIMITY_THRESHOLDS = {25.0, 15.0};    // proximity distance to consider 2 lines close, (angle dependant)
+    const double MIN_LINE_LENGTH = 20;
+    const double ANGLE_THRESHOLD = 20.0;                              // difference to consider 2 angles similar
+    const double WHITENESS_THRESHOLD = 0.4;                           // used for eliminate some lines
+
+    // Matching lines parameters
+    const double START_END_DISTANCE_THRESHOLD = 85.0;                 // max distance between the start of the first line and the end of the second line
+    const double END_START_DISTANCE_THRESHOLD = 120.0;                // max distance between the end of the first line and the start of the second line
+    const double DELTA_X_THRESHOLD = 20.0;
+    const double DELTA_Y_THRESHOLD = 15.0;
+    const double MAX_PARALLEL_ANGLE = 10.0;                           // max angle to consider two lines as parallel
+
+    // Outliers elimination parameters
+    const std::vector<double> ASPECT_RATIO_THRESHOLDS = {1.4, 1.9};   // minimum aspect ratio for the rotated rects based on the angle of the parking space
+    const int MARGIN = 90;                                            // distance to consider from the edges of a rotated rect
+
+    // Other parameters
+    const double RADIUS = 35.0;
     const float IOU_THRESHOLD = 0.9;
-    const float ANGLE = 10.0;
-    const double max_init_distance = 120.0;           // Soglia di prossimità per considerare due linee parallele "vicine"
-    const double maxParallel_angle = 10.0;            // Max angle to consider two lines as parallel
 
-    const double minLineLength = 20;                  // Lunghezza minima della linea
-    const double whitenessThreshold = 0.4;
-    const double proximityThreshold1 = 25.0;          // Soglia di prossimità per considerare due linee "vicine"
-    const double proximityThreshold2 = 15.0;
-    const double angleThreshold = 20.0;               // Soglia per considerare due angoli simili
-
-    const double startEndDistanceThreshold = 85.0;
-    const double endStartDistanceThreshold = 120.0;
-    const double deltaXThreshold = 20.0;
-    const double deltaYThreshold = 15.0;
-
-    const std::vector<double> ASPECT_RATIO_THRESHOLDS = {1.4, 1.8};
-    const int MARGIN = 90;
-
-    std::vector<std::pair<double, double>> parkingSpaceLinesAngles = {FIRST_ANGLE_RANGE, SECOND_ANGLE_RANGE};
     std::vector<cv::RotatedRect> boundingBoxesCandidates;
-
-    cv::Mat clone2;
-
-    // Image preprocessing and find the candidate
     for (const auto& iter : std::filesystem::directory_iterator(emptyFramesDir)) {
         std::string imgPath = iter.path().string();
 
@@ -760,8 +674,7 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
             std::cerr << "Error opening the image" << std::endl;
         }
         cv::Size imgSize = input.size();
-        cv::Mat clone = input.clone();
-        clone2 = input.clone();
+        cv::Mat clone = input.clone(); // TODO eliminate
 
         // LSH line detector
         cv::Mat gray;
@@ -775,35 +688,35 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
             lines[i] = standardizeLine(lines[i]);
 
         // Filter the lines
-        std::vector<cv::Vec4i> filteredLines = filterLines(lines, input, parkingSpaceLinesAngles, proximityThreshold1, proximityThreshold2, minLineLength, angleThreshold, whitenessThreshold);
-        std::vector<std::pair<cv::Vec4i, cv::Vec4i>> matchedLines = matchLines(filteredLines, parkingSpaceLinesAngles, startEndDistanceThreshold, endStartDistanceThreshold, maxParallel_angle, deltaXThreshold, deltaYThreshold);
+        std::vector<cv::Vec4i> filteredLines = filterLines(lines, input, PARKING_SPACE_LINES_ANGLES, PROXIMITY_THRESHOLDS, MIN_LINE_LENGTH, ANGLE_THRESHOLD, WHITENESS_THRESHOLD);
+        std::vector<std::pair<cv::Vec4i, cv::Vec4i>> matchedLines = matchLines(filteredLines, PARKING_SPACE_LINES_ANGLES, START_END_DISTANCE_THRESHOLD, END_START_DISTANCE_THRESHOLD, MAX_PARALLEL_ANGLE, DELTA_X_THRESHOLD, DELTA_Y_THRESHOLD);
 
         // Build the rotated rects
         std::vector<cv::RotatedRect> rotatedRects = linesToRotatedRect(matchedLines);
-        GenerateRotatedRects(rotatedRects, clone);
 
-        //removeOutliers(rotatedRects, MARGIN, imgSize, clone);
-        removeOutliers(rotatedRects, parkingSpaceLinesAngles, imgSize, MARGIN, ASPECT_RATIO_THRESHOLDS);
+        // Infer missing rects
+        GenerateRotatedRects(rotatedRects);
+
+        // Remove rotated rects outliers
+        removeOutliers(rotatedRects, PARKING_SPACE_LINES_ANGLES, imgSize, MARGIN, ASPECT_RATIO_THRESHOLDS);
+
+
+        /*// TODO Eliminate
         drawRotatedRects(clone, rotatedRects);
-
         cv::imshow("Rotated Rectangles", clone);
-        cv::waitKey(0);
+        cv::waitKey(0);*/
 
 
         boundingBoxesCandidates.insert(boundingBoxesCandidates.end(), rotatedRects.begin(), rotatedRects.end());
-
     }
 
-    std::vector<std::vector<cv::RotatedRect>> boundingBoxesNonMaximaSupp;
 
-
+    std::vector<std::vector<cv::RotatedRect>> boundingBoxesParkingSpaces;
     while (!boundingBoxesCandidates.empty()) {
         std::vector<cv::RotatedRect> parkingSpaceBoxes;
 
         // First populate the map with the first not analyzed parking space
         auto iterator = boundingBoxesCandidates.begin();
-
-
         cv::Point centerParkingSpace = iterator->center;
         parkingSpaceBoxes.push_back(*iterator);
         boundingBoxesCandidates.erase(iterator); // remove it in order to not insert it twice
@@ -812,32 +725,25 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
         auto iterator2 = boundingBoxesCandidates.begin();
         while (iterator2 != boundingBoxesCandidates.end()) {
             cv::Point anotherCenter = iterator2->center;
+
             if (isWithinRadius(centerParkingSpace, anotherCenter, RADIUS)) {
-                parkingSpaceBoxes.push_back(*iterator);
+                parkingSpaceBoxes.push_back(*iterator2);
                 iterator2 = boundingBoxesCandidates.erase(iterator2);  // Erase and get the next iterator
             } else {
                 ++iterator2;  // Pre-increment for efficiency purpose
             }
         }
 
-
-        // All candidates for a parking space are found, need to clear them with nms
-        std::vector<cv::RotatedRect> validBoxes = nonMaximaSuppressionROTTTT(parkingSpaceBoxes, IOU_THRESHOLD);
-
-
-        boundingBoxesNonMaximaSupp.push_back(validBoxes);
+        boundingBoxesParkingSpaces.push_back(parkingSpaceBoxes);
     }
 
-    std::vector<cv::RotatedRect> finalBoundingBoxes = computeAverageRect(boundingBoxesNonMaximaSupp);
-    drawRotatedRects(clone2, finalBoundingBoxes);
-    cv::imshow("Rotated Rectangles", clone2);
-    cv::waitKey(0);
+    // For all valid boxes, make the average (since we have no score for a bounding box, all have the same weight)
+    std::vector<cv::RotatedRect> finalBoundingBoxes = computeAverageRect(boundingBoxesParkingSpaces);
 
-
+    // Build the bounding boxes
     unsigned short parkNumber = 1;
     for (const cv::RotatedRect rotRect : finalBoundingBoxes) {
         BoundingBox bbox = BoundingBox(rotRect, parkNumber++);
         bBoxes.push_back(bbox);
     }
-
 }

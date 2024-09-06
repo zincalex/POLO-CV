@@ -42,9 +42,7 @@ int main(int argc, char** argv) {
     ParkingSpaceDetector psDetector = ParkingSpaceDetector(pathSequence0FramesDir);
     std::vector<BoundingBox> bBoxes = psDetector.getBBoxes();
 
-
-    // For each image
-    for (const auto& iter : std::filesystem::directory_iterator(pathSequenceFramesDir)) {
+    for (const auto& iter : std::filesystem::directory_iterator(pathSequenceFramesDir)) { // For each image
         std::string imgPath = iter.path().string();
 
         std::string filenameWithoutExtension = iter.path().stem().string(); // Removes the ".png"
@@ -53,12 +51,14 @@ int main(int argc, char** argv) {
         std::string xmlPath = xmlDirectory + "/" + xmlFilename;
 
 
-        //XMLReader groundTruth = XMLReader(xmlPath);
-        //cv::Mat parkingImg = cv::imread(imgPath);
-        //ParkingLotStatus parkingStatus = ParkingLotStatus(parkingImg, groundTruth.getBBoxes());
+        XMLReader groundTruth = XMLReader(xmlPath);
+        cv::Mat parkingImg = cv::imread(imgPath);
+        std::cout << imgPath << std::endl;
+        ParkingLotStatus parkingStatus = ParkingLotStatus(parkingImg, bBoxes);
 
-        //parkingStatus.drawParkingLotStatus();
-        //cv::imshow("sss", parkingStatus.getStatusImage());
+        parkingStatus.drawParkingLotStatus();
+        cv::imshow("sss", parkingStatus.getStatusImage());
+        cv::waitKey(0);
 
         // First Metric
 

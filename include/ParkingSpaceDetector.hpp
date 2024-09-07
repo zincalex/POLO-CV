@@ -7,8 +7,8 @@
 #include <vector>
 #include <iostream>
 #include <filesystem>
-#include <optional>  // Requires C++17 or later
-#include <limits> // For std::numeric_limits
+#include <optional>                         // Requires C++17 or later
+#include <limits>
 
 #include <opencv2/imgproc.hpp>
 #include <opencv4/opencv2/highgui.hpp>
@@ -17,6 +17,8 @@
 class ParkingSpaceDetector {
 public:
     ParkingSpaceDetector(const std::filesystem::path& emptyFramesDir);
+
+    cv::Mat createParkingLotMask(const std::vector<cv::RotatedRect>& rotatedRects, const cv::Size& imgSize) const;
 
     std::vector<BoundingBox> getBBoxes() { return bBoxes; }
 
@@ -32,33 +34,23 @@ private:
     bool isWithinRadius(const cv::Point& center, const cv::Point& point, const double& radius) const;
 
     cv::Point2f getBottomRight(const cv::RotatedRect& rect) const;
-
-
     cv::Vec4i standardizeLine(const cv::Vec4i& line) const;
-
 
     std::vector<cv::Vec4i> filterLines(std::vector<cv::Vec4i>& lines, const cv::Mat& referenceImage, const std::vector<std::pair<double, double>>& parkingSpaceLinesAngles,
                                        const std::vector<double>& proximityThresholds, const double& minLength,
                                        const double& angleThreshold, const double& whitenessThreshold) const;
 
-
     std::vector<std::pair<cv::Vec4i, cv::Vec4i>> matchLines(const std::vector<cv::Vec4i>& linesSupreme, const std::vector<std::pair<double, double>>& parkingSpaceLinesAngles,
                                                             const double& startEndDistanceThreshold, const double& endStartDistanceThreshold, const double& angleThreshold,
                                                             const double& deltaXThreshold, const double& deltaYThreshold) const;
 
-
     std::vector<cv::RotatedRect> linesToRotatedRect(const std::vector<std::pair<cv::Vec4i, cv::Vec4i>>& matchedLines) const ;
-
-
-    void GenerateRotatedRects(std::vector<cv::RotatedRect>& rotatedRects) const;
-
+    void InferRotatedRects(std::vector<cv::RotatedRect>& rotatedRects, std::pair<double, double> test) const;
 
     void removeOutliers(std::vector<cv::RotatedRect>& rotatedRects, const std::vector<std::pair<double, double>>& parkingSpaceLinesAngles,
                         const cv::Size& imgSize, const int& margin, const std::vector<double>& aspectRatioThresholds) const;
 
-
-    std::vector<cv::RotatedRect> computeAverageRect(const std::vector<std::vector<cv::RotatedRect>>& boundingBoxesNMS);
-
+    std::vector<cv::RotatedRect> computeAverageRect(const std::vector<std::vector<cv::RotatedRect>>& boundingBoxesParkingSpaces);
 };
 
 #endif

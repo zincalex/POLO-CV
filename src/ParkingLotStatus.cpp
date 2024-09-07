@@ -86,7 +86,7 @@ ParkingLotStatus::ParkingLotStatus(const cv::Mat& parkingImage, std::vector<Boun
 
     cv::Mat clone = parkingImage.clone();
 
-    const double DEBUG = true;
+    const double DEBUG = false;
 
     this->parkingImage = parkingImage;
     for (BoundingBox& bBox : bBoxes) {

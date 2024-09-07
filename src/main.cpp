@@ -53,7 +53,6 @@ int main(int argc, char** argv) {
 
         XMLReader groundTruth = XMLReader(xmlPath);
         cv::Mat parkingImg = cv::imread(imgPath);
-        std::cout << imgPath << std::endl;
         ParkingLotStatus parkingStatus = ParkingLotStatus(parkingImg, bBoxes);
 
         parkingStatus.drawParkingLotStatus();

@@ -30,6 +30,11 @@ add_library(ParkingLotStatus
         src/ParkingLotStatus.cpp
 )
 
+add_library(Segmentation
+        include/Segmentation.hpp
+        src/Segmentation.cpp
+)
+
 add_library(Xml
         include/XMLReader.hpp
         src/XMLReader.cpp
@@ -44,4 +49,4 @@ add_executable(${PROJECT_NAME}
         src/main.cpp
 )
 
-target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS} ParkingSpaceDetector ParkingLotStatus Xml Metrics BBox ImgProcessing)
+target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS} ParkingSpaceDetector ParkingLotStatus Xml Metrics BBox ImgProcessing Segmentation)

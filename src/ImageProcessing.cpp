@@ -111,3 +111,28 @@ cv::Mat ImageProcessing::morphologicalSkeleton(const cv::Mat& binaryImg) {
 
     return skeleton;
 }
+
+cv::Mat applyCLAHE(const cv::Mat& input){
+    cv::Mat CLAHEimage;
+    cv::cvtColor(input, CLAHEimage, cv::COLOR_BGR2Lab);
+    std::vector<cv::Mat> lab_planes(3);
+    cv::split(CLAHEimage, lab_planes);
+
+    // Apply CLAHE to the L (lightness) channel
+    cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE();
+    clahe->setClipLimit(2.0); // Set clip limit
+    clahe->setTilesGridSize(cv::Size(8, 8)); // Set tile grid size
+
+    cv::Mat clahe_l;
+    clahe->apply(lab_planes[0], clahe_l); // Apply CLAHE to the L channel
+
+    // Merge the modified L channel back with the original A and B channels
+    lab_planes[0] = clahe_l;
+    cv::Mat lab_clahe_image;
+    cv::merge(lab_planes, lab_clahe_image);
+
+    // Convert the LAB image back to BGR color space
+    cv::Mat clahe_bgr_image;
+    cv::cvtColor(lab_clahe_image, clahe_bgr_image, cv::COLOR_Lab2BGR);
+    return clahe_bgr_image;
+}

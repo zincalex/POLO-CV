@@ -6,6 +6,7 @@
 #include "../include/ParkingSpaceDetector.hpp"
 #include "../include/ParkingLotStatus.hpp"
 #include "../include/XMLReader.hpp"
+#include "../include/Segmentation.hpp"
 
 bool checkDirectory(const std::filesystem::path& dirPath, const std::string& dirName) {
     if (!std::filesystem::exists(dirPath) || !std::filesystem::is_directory(dirPath)) {
@@ -62,6 +63,7 @@ int main(int argc, char** argv) {
         // First Metric
 
         // Segmentation
+        Segmentation seg = Segmentation(pathSequence0FramesDir, pathSequenceFramesDir);
 
         // Second Metric
 

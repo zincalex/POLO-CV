@@ -13,7 +13,7 @@ public:
     static cv::Mat minFilter(const cv::Mat& input, const int& kernel_size);
     static cv::Mat adjustContrast(const cv::Mat& inputImg, const double& contrastFactor, const int& brightnessOffset);
     static cv::Mat morphologicalSkeleton(const cv::Mat& binaryImg);
-
+     cv::Mat applyCLAHE(const cv::Mat& input);
 };
 
 #endif

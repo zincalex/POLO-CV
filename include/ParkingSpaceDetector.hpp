@@ -32,6 +32,7 @@ private:
     bool areAnglesSimilar(const double& angle1, const double& angle2, const double& angleThreshold) const;
     bool isInRange(const double& angle, const std::pair<double, double>& range) const;
     bool isWithinRadius(const cv::Point& center, const cv::Point& point, const double& radius) const;
+    bool isTopLeftInside(const BoundingBox& bbox1, const BoundingBox& bbox2) const;
 
     cv::Point2f getBottomRight(const cv::RotatedRect& rect) const;
     cv::Vec4i standardizeLine(const cv::Vec4i& line) const;
@@ -51,6 +52,9 @@ private:
                         const cv::Size& imgSize, const int& margin, const std::vector<double>& aspectRatioThresholds) const;
 
     std::vector<cv::RotatedRect> computeAverageRect(const std::vector<std::vector<cv::RotatedRect>>& boundingBoxesParkingSpaces);
+
+    void adjustPerspective(std::vector<cv::RotatedRect>& rects, const cv::Size& imgSize, const std::vector<std::pair<double, double>>& parkingSpaceAngles,
+                           const unsigned short& minIncrement, const unsigned short& maxIncrement) const;
 };
 
 #endif

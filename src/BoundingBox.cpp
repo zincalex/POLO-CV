@@ -18,12 +18,20 @@ void BoundingBox::updateState() {
 cv::Point BoundingBox::getTlCorner() const {
     cv::Point2f vertices[4];
     rect.points(vertices);
-    return cv::Point(static_cast<int>(vertices[0].x), static_cast<int>(vertices[0].y));
+    cv::Point topLeft = vertices[0];
+    double minSum = topLeft.y;
+
+    // The top left corner has the lowest y coordinate
+    for (unsigned int i = 1; i < 4; ++i) {
+        double sum = vertices[i].y;
+        if (sum < minSum) {
+            minSum = sum;
+            topLeft = vertices[i];
+        }
+    }
+
+    return topLeft;
 }
 
-cv::Point BoundingBox::getBrCorner() const {
-    cv::Point2f vertices[4];
-    rect.points(vertices);
-    return cv::Point(static_cast<int>(vertices[2].x), static_cast<int>(vertices[2].y));
-}
+
 

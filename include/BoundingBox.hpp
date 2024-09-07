@@ -10,7 +10,6 @@ public:
     void updateState();
 
     cv::Point getTlCorner() const;
-    cv::Point getBrCorner() const;
 
 
     cv::Point getCenter() const      { return center; }

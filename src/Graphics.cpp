@@ -93,9 +93,9 @@ cv::Mat Graphics::drawMap(const std::vector<cv::RotatedRect> &parkingSpaces) {
 
     cv::Mat parkingMap(height, width, CV_8UC3, cv::Scalar(255, 255, 255));
 
-    for (int i = 0; i < parkingSpaces.size(); i++) {
+    for (const auto & parkingSpace : parkingSpaces) {
         cv::Point2f vertices[4];
-        parkingSpaces[i].points(vertices);
+        parkingSpace.points(vertices);
 
         for (int i = 0; i < 4; i++) {
             cv::line(parkingMap, vertices[i], vertices[(i + 1) % 4], cv::Scalar(51, 36, 4), 5);
@@ -118,8 +118,8 @@ void Graphics::fillRotatedRectsWithCar(cv::Mat &image, const std::vector<cv::Rot
         rectangles[i].points(vertices);
 
         std::vector<cv::Point> points;
-        for (int j = 0; j < 4; j++) {
-            points.push_back(vertices[j]);
+        for (auto vertex : vertices) {
+            points.push_back(vertex);
         }
 
         std::vector<std::vector<cv::Point>> fillPoints = { points };
@@ -128,7 +128,7 @@ void Graphics::fillRotatedRectsWithCar(cv::Mat &image, const std::vector<cv::Rot
 }
 
 
-void Graphics::mapOverlay(cv::Mat &src, cv::Mat map) {
+void Graphics::mapOverlay(cv::Mat &src, const cv::Mat& map) {
     // Create a local copy of the map to modify without changing the original
     cv::Mat mapLocal = map.clone();
 

@@ -26,6 +26,9 @@ double calculateIoU(const cv::RotatedRect& rect1, const cv::RotatedRect& rect2) 
 }
 
 double Metrics::calculateMeanAveragePrecisionParkingSpaceLocalization() const {
+
+    const bool DEBUG = true;
+
     const double RADIUS = 45.0;
     const double IOU_THRESHOLD = 0.5;
 
@@ -43,22 +46,21 @@ double Metrics::calculateMeanAveragePrecisionParkingSpaceLocalization() const {
     for (const BoundingBox& trueBox : groundTruth)
         trueBox.isOccupied() ? sortedGroundTruth[1].push_back(trueBox): sortedGroundTruth[0].push_back(trueBox);
 
-
-
+    
     // Calculate the cumulative precisions and recalls for each class
     for (unsigned int i = 0; i < 2; ++i) {
         unsigned int totalGroundTruths = sortedGroundTruth[i].size();
         unsigned int truePositives = 0;
         unsigned int falsePositives = 0;
-
+        if (DEBUG) std::cout << "Working for cars that are : " << i << std::endl;
         for (const BoundingBox &predictBBox: sortedPredictionBoxes[i]) {
             for (const BoundingBox &trueBBox: sortedGroundTruth[i]) {
 
                 // Same parking spot
                 if (isWithinRadius(predictBBox.getCenter(), trueBBox.getCenter(), RADIUS)) {
-                    std::cout << "Pred box  " << predictBBox.getNumber() << " matched with ground truth " << trueBBox.getNumber() << std::endl;
+                    if (DEBUG) std::cout << "Pred box  " << predictBBox.getNumber() << " matched with ground truth " << trueBBox.getNumber() << std::endl;
                     double iou = calculateIoU(predictBBox.getRotatedRect(), trueBBox.getRotatedRect());
-                    std::cout << "IOU: " << iou << std::endl;
+                    if (DEBUG) std::cout << "IOU: " << iou << std::endl;
                     (iou >= IOU_THRESHOLD) ? truePositives++ : falsePositives++;
                     precisions[i].push_back(truePositives / (truePositives + falsePositives));
                     recalls[i].push_back(truePositives / totalGroundTruths);
@@ -67,6 +69,7 @@ double Metrics::calculateMeanAveragePrecisionParkingSpaceLocalization() const {
 
             }
         }
+        if (DEBUG) std::cout << "-----------------" << std::endl;
     }
 
 
@@ -88,7 +91,7 @@ double Metrics::calculateMeanAveragePrecisionParkingSpaceLocalization() const {
         }
         average_precision[i] = ap / 11.0;   // 11 Point Interpolation Method
 
-        std::cout << "avgP: " << average_precision[i] << std::endl;
+        if (DEBUG) std::cout << "avgP: " << average_precision[i] << std::endl;
     }
 
 

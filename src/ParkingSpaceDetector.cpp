@@ -222,7 +222,8 @@ std::vector<std::pair<cv::Vec4i, cv::Vec4i>> ParkingSpaceDetector::matchLines(co
         cv::Point2f start1(lines[i][0], lines[i][1]);
         cv::Point2f end1(lines[i][2], lines[i][3]);
 
-        std::optional<cv::Vec4i> bestCandidate;
+        cv::Vec4i bestCandidate;
+        bool foundCandidate = false;
         double minDist = std::numeric_limits<double>::max();
 
         // In order to visualize the line matched, modify the method and pass an image
@@ -243,11 +244,13 @@ std::vector<std::pair<cv::Vec4i, cv::Vec4i>> ParkingSpaceDetector::matchLines(co
                 if (startEndDist <= startEndDistanceThreshold && isInRange(angle1, FIRST_ANGLE_RANGE) && absDeltaY >= deltaYThreshold && startEndDist < minDist) {
                     bestCandidate = lines[j];
                     minDist = startEndDist;
+                    foundCandidate = true;
                     /*cv::line(image, cv::Point2f(start2.x, start2.y), cv::Point2f(end2.x, end2.y), cv::Scalar(255, 0, 0), 2, cv::LINE_AA);*/
                 } // Control for negative rotated rects
                 else if (endStartDist <= endStartDistanceThreshold && isInRange(angle1, SECOND_ANGLE_RANGE) && deltaX >= deltaXThreshold && startEndDist < minDist) {
                     bestCandidate = lines[j];
                     minDist = startEndDist;
+                    foundCandidate = true;
                     /*cv::line(image, cv::Point2f(start2.x, start2.y), cv::Point2f(end2.x, end2.y), cv::Scalar(255, 0, 0), 2, cv::LINE_AA);*/
                 }
             }
@@ -255,8 +258,8 @@ std::vector<std::pair<cv::Vec4i, cv::Vec4i>> ParkingSpaceDetector::matchLines(co
         /*cv::imshow("progress", image);
         cv::waitKey(0);
         image = imageSi.clone();*/
-        if (bestCandidate.has_value())
-            matchedLines.push_back(std::make_pair(lines[i], bestCandidate.value()));
+        if (foundCandidate)
+            matchedLines.push_back(std::make_pair(lines[i], bestCandidate));
     }
 
     return matchedLines;
@@ -461,6 +464,54 @@ cv::Mat ParkingSpaceDetector::createParkingLotMask(const std::vector<cv::Rotated
 }
 
 
+std::pair<bool, bool> ParkingSpaceDetector::checkSides(const cv::RotatedRect& rotatedRect, const cv::Mat& mask, const int& margin, const cv::Size& imgSize) const {
+    cv::Point2f vertices[4];
+    rotatedRect.points(vertices);
+
+    // Calculate the midpoints of the left and right sides
+    cv::Point2f midpointLeft = (vertices[0] + vertices[3]) * 0.5;
+    cv::Point2f midpointRight = (vertices[1] + vertices[2]) * 0.5;
+
+    // Calculate the direction vectors (perpendicular to the rectangle's orientation)
+    cv::Point2f direction = midpointRight - midpointLeft;
+    direction = direction / cv::norm(direction);  // Normalize the direction vector
+
+    // Calculate the endpoints for the lines
+    cv::Point2f pointLeft = midpointLeft - margin * direction;
+    cv::Point2f pointRight = midpointRight + margin * direction;
+
+    // Remove rectangles that are between 2 parking spaces
+    bool touchedLeft = false;
+    bool touchedRight = false;
+    int numSteps = 50; // Number of points to check along the line
+    for (unsigned int step = 1; step <= numSteps; ++step) {
+        double alpha = static_cast<double>(step) / numSteps;
+        cv::Point2f interpolatedPointLeft = midpointLeft * (1.0f - alpha) + pointLeft * alpha;
+        cv::Point2f interpolatedPointRight = midpointRight * (1.0f - alpha) + pointRight * alpha;
+
+        // Ensure that the points are within the image boundaries
+        if (interpolatedPointLeft.x >= 0 && interpolatedPointLeft.x < imgSize.width &&
+            interpolatedPointLeft.y >= 0 && interpolatedPointLeft.y < imgSize.height &&
+            interpolatedPointRight.x >= 0 && interpolatedPointRight.x < imgSize.width &&
+            interpolatedPointRight.y >= 0 && interpolatedPointRight.y < imgSize.height) {
+
+            // Draw yellow dots at each interpolated point, IMPORT THE IMAGE FOR REPORT FOR PRINTING
+            //cv::circle(image, interpolatedPointLeft, 2, cv::Scalar(0, 255, 255), 1); // Yellow dot
+            //cv::circle(image, interpolatedPointRight, 2, cv::Scalar(0, 255, 255), 1); // Yellow dot
+
+            // Check if the interpolated points are in the white area on the mask
+            if (mask.at<uchar>(cv::Point(interpolatedPointLeft)) == 255)
+                touchedLeft = true;
+
+            if (mask.at<uchar>(cv::Point(interpolatedPointRight)) == 255)
+                touchedRight = true;
+        }
+        //cv::line(image, pointLeft, pointRight, cv::Scalar(0, 255, 0), 1);  // Green line with thickness 2
+    }
+    return std::make_pair(touchedLeft, touchedRight);
+}
+
+
 void ParkingSpaceDetector::removeOutliers(std::vector<cv::RotatedRect>& rotatedRects, const std::vector<std::pair<double, double>>& parkingSpaceLinesAngles,
                                           const cv::Size& imgSize, const int& margin, const std::vector<double>& aspectRatioThresholds) const {
 
@@ -473,52 +524,10 @@ void ParkingSpaceDetector::removeOutliers(std::vector<cv::RotatedRect>& rotatedR
     // OUTLIER ELIMINATION
     // First outliers : parking spaces detected between other parking spaces
     for (unsigned int i = 0; i < rotatedRects.size(); ++i) {
-        cv::Point2f vertices[4];
-        rotatedRects[i].points(vertices);
+        std::pair<bool, bool> touched = checkSides(rotatedRects[i], mask, margin, imgSize);
 
-        // Calculate the midpoints of the left and right sides
-        cv::Point2f midpointLeft = (vertices[0] + vertices[3]) * 0.5;
-        cv::Point2f midpointRight = (vertices[1] + vertices[2]) * 0.5;
-
-        // Calculate the direction vectors (perpendicular to the rectangle's orientation)
-        cv::Point2f direction = midpointRight - midpointLeft;
-        direction = direction / cv::norm(direction);  // Normalize the direction vector
-
-        // Calculate the endpoints for the lines
-        cv::Point2f pointLeft = midpointLeft - margin * direction;
-        cv::Point2f pointRight = midpointRight + margin * direction;
-
-        // Remove rectangles that are between 2 parking spaces
-        bool touchedLeft = false;
-        bool touchedRight = false;
-        int numSteps = 50; // Number of points to check along the line
-        for (unsigned int step = 1; step <= numSteps; ++step) {
-            double alpha = static_cast<double>(step) / numSteps;
-            cv::Point2f interpolatedPointLeft = midpointLeft * (1.0f - alpha) + pointLeft * alpha;
-            cv::Point2f interpolatedPointRight = midpointRight * (1.0f - alpha) + pointRight * alpha;
-
-            // Ensure that the points are within the image boundaries
-            if (interpolatedPointLeft.x >= 0 && interpolatedPointLeft.x < imgSize.width &&
-                interpolatedPointLeft.y >= 0 && interpolatedPointLeft.y < imgSize.height &&
-                interpolatedPointRight.x >= 0 && interpolatedPointRight.x < imgSize.width &&
-                interpolatedPointRight.y >= 0 && interpolatedPointRight.y < imgSize.height) {
-
-                // Draw yellow dots at each interpolated point, IMPORT THE IMAGE FOR REPORT FOR PRINTING
-                /*cv::circle(image, interpolatedPointLeft, 3, cv::Scalar(0, 255, 255), 1); // Yellow dot
-                cv::circle(image, interpolatedPointRight, 3, cv::Scalar(0, 255, 255), 1); // Yellow dot*/
-
-                // Check if the interpolated points are in the white area on the mask
-                if (mask.at<uchar>(cv::Point(interpolatedPointLeft)) == 255)
-                    touchedLeft = true;
-
-                if (mask.at<uchar>(cv::Point(interpolatedPointRight)) == 255)
-                    touchedRight = true;
-            }
-
-            if (touchedLeft && touchedRight)
-                outlier[i] = true;  // Mark the rectangle as an outlier
-            /*cv::line(image, pointLeft, pointRight, cv::Scalar(0, 255, 0), 2);  // Green line with thickness 2*/
-        }
+        if (touched.first && touched.second) // the rotated rect is between other rotated rects
+            outlier[i] = true;
 
 
         // Second outliers : rotated rects with a specific angles that differ to much from the other types
@@ -580,6 +589,37 @@ void ParkingSpaceDetector::removeOutliers(std::vector<cv::RotatedRect>& rotatedR
 }
 
 
+std::vector<std::vector<cv::RotatedRect>> ParkingSpaceDetector::matchParkingSpaces(std::vector<cv::RotatedRect>& boundingBoxesCandidates, const double& radius) const {
+    std::vector<std::vector<cv::RotatedRect>> boundingBoxesParkingSpaces;
+    while (!boundingBoxesCandidates.empty()) {
+        std::vector<cv::RotatedRect> parkingSpaceBoxes;
+
+        // First populate the vector with the first not analyzed parking space
+        auto iterator = boundingBoxesCandidates.begin();
+        cv::Point centerParkingSpace = iterator->center;
+        parkingSpaceBoxes.push_back(*iterator);
+        boundingBoxesCandidates.erase(iterator); // remove it in order to not insert it twice
+
+        // Look for all the other candidates if there is one that represent the same parking lot
+        auto iterator2 = boundingBoxesCandidates.begin();
+        while (iterator2 != boundingBoxesCandidates.end()) {
+            cv::Point anotherCenter = iterator2->center;
+
+            if (isWithinRadius(centerParkingSpace, anotherCenter, radius)) {
+                parkingSpaceBoxes.push_back(*iterator2);
+                iterator2 = boundingBoxesCandidates.erase(iterator2);  // Erase and get the next iterator
+            } else {
+                ++iterator2;  // Pre-increment for efficiency purpose
+            }
+        }
+
+        boundingBoxesParkingSpaces.push_back(parkingSpaceBoxes);
+    }
+
+    return boundingBoxesParkingSpaces;
+}
+
+
 std::vector<cv::RotatedRect> ParkingSpaceDetector::computeAverageRect(const std::vector<std::vector<cv::RotatedRect>>& boundingBoxesParkingSpaces) {
 
     std::vector<cv::RotatedRect> averages;
@@ -617,7 +657,7 @@ std::vector<cv::RotatedRect> ParkingSpaceDetector::computeAverageRect(const std:
 
 
 void ParkingSpaceDetector::adjustPerspective(std::vector<cv::RotatedRect>& rects, const cv::Size& imgSize, const std::vector<std::pair<double, double>>& parkingSpaceAngles,
-                                             const unsigned short& minIncrement, const unsigned short& maxIncrement) const {
+                                             const int& margin, const unsigned short& minIncrement, const unsigned short& maxIncrement) const {
 
     for (cv::RotatedRect& rect : rects) {
         double change = 0;
@@ -626,7 +666,7 @@ void ParkingSpaceDetector::adjustPerspective(std::vector<cv::RotatedRect>& rects
 
         // Closer to the top (centerY close to 0) will have higher increment, closer to bottom (centerY close to image height) will have lower increment
         double incrementFactor = (1 - centerY / imgSize.height) * (maxIncrement - minIncrement) + minIncrement;
-        if (isInRange(rect.angle, parkingSpaceAngles[0])) { // 95 - 110 range
+        if (isInRange(rect.angle, parkingSpaceAngles[0])) { // 5 - 20 range
             originalLength = rect.size.width;
             rect.size.width += incrementFactor;
             change = rect.size.width - originalLength;
@@ -638,6 +678,21 @@ void ParkingSpaceDetector::adjustPerspective(std::vector<cv::RotatedRect>& rects
         }
         rect.center.y -= static_cast<unsigned int>(change / 2);
     }
+
+    cv::Mat rotatedRectMask = createParkingLotMask(rects, imgSize);
+    for (cv::RotatedRect& rect : rects) {
+        if (isInRange(rect.angle, parkingSpaceAngles[0])) { // 5 - 20 range
+            std::pair<bool, bool> touched = checkSides(rect, rotatedRectMask, margin+50, imgSize);
+            if (touched.first) { // The rect has the right side free, move it to the left
+                rect.center.y -= 5;
+                rect.center.x -= 15;
+            }
+            else { // The rect has the left side free, move it to the right
+                rect.center.y += 5;
+                rect.center.x += 15;
+            }
+        }
+    }
 }
 
 
@@ -645,7 +700,7 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
     // PARAMETERS
     // Main angle ranges of the parking lines (can be adjusted accordingly)
     const std::vector<std::pair<double, double>> PARKING_SPACE_LINES_ANGLES = {std::make_pair(5.0, 20.0), std::make_pair(-87, -55.0)};
-    const std::vector<std::pair<double, double>> PARKING_SPACE_ANGLES = {std::make_pair(95.0, 110.0), std::make_pair(3, 35.0)};         // Same as above but with +90
+    const std::vector<std::pair<double, double>> PARKING_SPACE_ANGLES = {std::make_pair(95.0, 110.0), std::make_pair(3, 35)};         // Same as above but with +90
 
     // Line filter parameters
     const std::vector<double> PROXIMITY_THRESHOLDS = {25.0, 15.0};    // proximity distance to consider 2 lines close, (angle dependant)
@@ -666,13 +721,13 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
 
     // Perspective parameters
     const unsigned short MIN_LENGTH_INCREMENT = 5;
-    const unsigned short MAX_LENGTH_INCREMENT = 26;
+    const unsigned short MAX_LENGTH_INCREMENT = 20;
 
     // Other parameters
     const double RADIUS = 35.5;
     const float IOU_THRESHOLD = 0.9;
 
-
+    cv::Mat clone2;
     std::vector<cv::RotatedRect> boundingBoxesCandidates;
     cv::Size imgSize;
     for (const auto& iter : std::filesystem::directory_iterator(emptyFramesDir)) {
@@ -685,6 +740,7 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
         }
         imgSize = input.size();
         cv::Mat clone = input.clone(); // TODO eliminate
+        clone2 = input.clone();
 
         // LSH line detector
         cv::Mat gray;
@@ -704,6 +760,7 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
         // Build the rotated rects
         std::vector<cv::RotatedRect> rotatedRects = linesToRotatedRect(matchedLines);
 
+
         // Infer missing rects
         InferRotatedRects(rotatedRects, PARKING_SPACE_ANGLES[1]);
 
@@ -719,32 +776,7 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
     }
 
     // See which rotated rects represents the same parking space
-    std::vector<std::vector<cv::RotatedRect>> boundingBoxesParkingSpaces;
-    while (!boundingBoxesCandidates.empty()) {
-        std::vector<cv::RotatedRect> parkingSpaceBoxes;
-
-        // First populate the map with the first not analyzed parking space
-        auto iterator = boundingBoxesCandidates.begin();
-        cv::Point centerParkingSpace = iterator->center;
-        parkingSpaceBoxes.push_back(*iterator);
-        boundingBoxesCandidates.erase(iterator); // remove it in order to not insert it twice
-
-        // Look for all the other candidates if there is one that represent the same parking lot
-        auto iterator2 = boundingBoxesCandidates.begin();
-        while (iterator2 != boundingBoxesCandidates.end()) {
-            cv::Point anotherCenter = iterator2->center;
-
-            if (isWithinRadius(centerParkingSpace, anotherCenter, RADIUS)) {
-                parkingSpaceBoxes.push_back(*iterator2);
-                iterator2 = boundingBoxesCandidates.erase(iterator2);  // Erase and get the next iterator
-            } else {
-                ++iterator2;  // Pre-increment for efficiency purpose
-            }
-        }
-
-        boundingBoxesParkingSpaces.push_back(parkingSpaceBoxes);
-    }
-
+    std::vector<std::vector<cv::RotatedRect>> boundingBoxesParkingSpaces = matchParkingSpaces(boundingBoxesCandidates, RADIUS);
 
     // For all valid boxes, make the average
     std::vector<cv::RotatedRect> finalBoundingBoxes = computeAverageRect(boundingBoxesParkingSpaces);
@@ -757,13 +789,15 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
                   return bottomRight1.y > bottomRight2.y;
               });
 
+
     // Adjust perspective
-    adjustPerspective(finalBoundingBoxes, imgSize, PARKING_SPACE_ANGLES, MIN_LENGTH_INCREMENT, MAX_LENGTH_INCREMENT);
+    adjustPerspective(finalBoundingBoxes, imgSize, PARKING_SPACE_ANGLES, MARGIN, MIN_LENGTH_INCREMENT, MAX_LENGTH_INCREMENT);
+
 
     // Build the bounding boxes
     unsigned short parkNumber = 1;
-    while (!finalBoundingBoxes.empty()) {
-
+    while (!finalBoundingBoxes.empty() && parkNumber < 38) {
+        std::cout << parkNumber << std::endl;
         // Find the bounding box with the bottom-right corner with the highest y value
         auto iterRectHighestBR = std::max_element(finalBoundingBoxes.begin(), finalBoundingBoxes.end(),
                                                   [this](const cv::RotatedRect &a, const cv::RotatedRect &b) {
@@ -775,7 +809,6 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
         BoundingBox bbox = BoundingBox(*iterRectHighestBR, parkNumber++);
         bBoxes.push_back(bbox);
         finalBoundingBoxes.erase(iterRectHighestBR);
-
 
         // Look for the connected/close parking spaces
         bool foundIntersecting;

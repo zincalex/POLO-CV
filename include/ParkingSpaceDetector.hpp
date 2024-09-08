@@ -49,13 +49,15 @@ private:
     std::vector<cv::RotatedRect> linesToRotatedRect(const std::vector<std::pair<cv::Vec4i, cv::Vec4i>>& matchedLines) const ;
     void InferRotatedRects(std::vector<cv::RotatedRect>& rotatedRects, std::pair<double, double> test) const;
 
+    std::pair<bool, bool> checkSides(const cv::RotatedRect& rotatedRect, const cv::Mat& mask, const int& margin, const cv::Size& imgSize) const;
     void removeOutliers(std::vector<cv::RotatedRect>& rotatedRects, const std::vector<std::pair<double, double>>& parkingSpaceLinesAngles,
                         const cv::Size& imgSize, const int& margin, const std::vector<double>& aspectRatioThresholds) const;
 
+    std::vector<std::vector<cv::RotatedRect>> matchParkingSpaces(std::vector<cv::RotatedRect>& boundingBoxesCandidates, const double& radius) const;
     std::vector<cv::RotatedRect> computeAverageRect(const std::vector<std::vector<cv::RotatedRect>>& boundingBoxesParkingSpaces);
 
     void adjustPerspective(std::vector<cv::RotatedRect>& rects, const cv::Size& imgSize, const std::vector<std::pair<double, double>>& parkingSpaceAngles,
-                           const unsigned short& minIncrement, const unsigned short& maxIncrement) const;
+                           const int& margin, const unsigned short& minIncrement, const unsigned short& maxIncrement) const;
 };
 
 #endif

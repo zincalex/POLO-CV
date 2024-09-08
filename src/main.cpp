@@ -57,21 +57,22 @@ int main(int argc, char** argv) {
         XMLReader groundTruth = XMLReader(xmlPath);
         cv::Mat parkingImg = cv::imread(imgPath);
         cv::Mat clone = parkingImg.clone();
-        ParkingLotStatus parkingStatus = ParkingLotStatus(parkingImg, bBoxes);
-        //ParkingLotStatus veritas = ParkingLotStatus(clone, groundTruth.getBBoxes());
-
         std::cout << "Working on img : " << imgPath << std::endl;
+        ParkingLotStatus parkingStatus = ParkingLotStatus(parkingImg, bBoxes);
+        ParkingLotStatus veritas = ParkingLotStatus(parkingImg, groundTruth.getBBoxes());
+
+
         cv::imshow("Status", parkingStatus.seeParkingLotStatus());
-        //cv::imshow("Veritas", veritas.seeParkingLotStatus());
-        cv::waitKey(0);
+        cv::imshow("Veritas", veritas.seeParkingLotStatus());
+
 
 
         // First Metric
         cv::Mat zero;
-        //Metrics metrics = Metrics(groundTruth.getBBoxes(), parkingStatus.getStatusPredictions(), zero);
+        Metrics metrics = Metrics(groundTruth.getBBoxes(), parkingStatus.getStatusPredictions(), zero);
 
-        //std::cout << "mAP: " << metrics.calculateMeanAveragePrecisionParkingSpaceLocalization() << std::endl;
-
+        std::cout << "mAP: " << metrics.calculateMeanAveragePrecisionParkingSpaceLocalization() << std::endl;
+        cv::waitKey(0);
         // Segmentation
 
         //Segmentation seg = Segmentation(pathSequence0FramesDir, imgPath);

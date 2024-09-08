@@ -7,10 +7,10 @@ bool isWithinRadius(const cv::Point& predictedCenter, const cv::Point& trueCente
 
 double calculateIoU(const cv::RotatedRect& rect1, const cv::RotatedRect& rect2) {
     std::vector<cv::Point2f> vertices1(4);
-    rect1.points(vertices1);
+    rect1.points(vertices1.data());
 
     std::vector<cv::Point2f> vertices2(4);
-    rect2.points(vertices2);
+    rect2.points(vertices2.data());
 
     // Find the intersection area
     std::vector<cv::Point2f> intersectionPoints;

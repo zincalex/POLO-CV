@@ -64,11 +64,11 @@ int main(int argc, char** argv) {
         cv::imshow("Status", parkingStatus.seeParkingLotStatus());
         //cv::imshow("Veritas", veritas.seeParkingLotStatus());
         cv::waitKey(0);
-        std::vector<unsigned short> a = parkingStatus.getOccupiedParkingSpaces();
+
 
         // First Metric
         cv::Mat zero;
-        Metrics metrics = Metrics(groundTruth.getBBoxes(), parkingStatus.getStatusPredictions(), zero);
+        //Metrics metrics = Metrics(groundTruth.getBBoxes(), parkingStatus.getStatusPredictions(), zero);
 
         //std::cout << "mAP: " << metrics.calculateMeanAveragePrecisionParkingSpaceLocalization() << std::endl;
 
@@ -80,7 +80,7 @@ int main(int argc, char** argv) {
         // Second Metric
 
         // 2D Map
-        Graphics::applyMap(imgPath, parkingStatus.getOccupiedParkingSpaces());
+        //Graphics::applyMap(imgPath, parkingStatus.getOccupiedParkingSpaces());
 
 
     }

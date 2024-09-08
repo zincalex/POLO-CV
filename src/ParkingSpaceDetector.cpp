@@ -669,9 +669,8 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
     const unsigned short MAX_LENGTH_INCREMENT = 26;
 
     // Other parameters
-    const double RADIUS = 35.0;
+    const double RADIUS = 35.5;
     const float IOU_THRESHOLD = 0.9;
-
 
 
     std::vector<cv::RotatedRect> boundingBoxesCandidates;
@@ -750,9 +749,16 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
     // For all valid boxes, make the average
     std::vector<cv::RotatedRect> finalBoundingBoxes = computeAverageRect(boundingBoxesParkingSpaces);
 
+    // Sort the boxes in order to make the labeling consistent
+    std::sort(finalBoundingBoxes.begin(), finalBoundingBoxes.end(),
+              [&](const cv::RotatedRect& rect1, const cv::RotatedRect& rect2) {
+                  cv::Point2f bottomRight1 = getBottomRight(rect1);
+                  cv::Point2f bottomRight2 = getBottomRight(rect2);
+                  return bottomRight1.y > bottomRight2.y;
+              });
+
     // Adjust perspective
     adjustPerspective(finalBoundingBoxes, imgSize, PARKING_SPACE_ANGLES, MIN_LENGTH_INCREMENT, MAX_LENGTH_INCREMENT);
-
 
     // Build the bounding boxes
     unsigned short parkNumber = 1;

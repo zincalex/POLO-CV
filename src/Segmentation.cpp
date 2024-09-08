@@ -43,98 +43,111 @@ cv::Mat Segmentation::backgroundSubtractionMask(const cv::Mat &empty_parking, co
 }
 
 cv::Mat Segmentation::smallContoursElimination(const cv::Mat& input_mask) {
-    cv::Mat out_mask;
+    cv::Mat in_mask;
+    in_mask = input_mask.clone();
     std::vector<std::vector<cv::Point>> contours;
     std::vector<cv::Vec4i> hierarchy;
+    cv::findContours(in_mask, contours, hierarchy, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
-    cv::findContours(input_mask, contours, hierarchy, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 // Filtro dei contorni per dimensione
     for (size_t i = 0; i < contours.size(); i++) {
         double area = cv::contourArea(contours[i]);
         // Se il contorno è troppo piccolo, lo eliminiamo
-        if (area < 100) { // Modifica la soglia a seconda delle dimensioni del tuo dataset
-            cv::drawContours(out_mask, contours, static_cast<int>(i), cv::Scalar(0), cv::FILLED);
+        if (area < 80) { // Modifica la soglia a seconda delle dimensioni del tuo dataset
+            cv::drawContours(in_mask, contours, static_cast<int>(i), cv::Scalar(0), cv::FILLED);
         }
     }
-    return out_mask;
+    return in_mask;
 }
 
 
 
 cv::Mat Segmentation::siftMaskEnhancement(const cv::Mat& starting_mask, const cv::Mat &empty_parking,
                                           const cv::Mat &masked_busy_parking) {
-    cv::Ptr<cv::SIFT> sift = cv::SIFT::create();
-    std::vector<cv::KeyPoint> keypoints_empty, keypoints_with_cars;
-    cv::Mat descriptors_empty, descriptors_with_cars;
+        cv::Ptr<cv::SIFT> sift = cv::SIFT::create();
+        std::vector<cv::KeyPoint> keypoints_empty, keypoints_with_cars;
+        cv::Mat descriptors_empty, descriptors_with_cars, sift_mask;
+        sift_mask = starting_mask.clone();
+        sift->detectAndCompute(empty_parking, cv::noArray(), keypoints_empty, descriptors_empty);
+        sift->detectAndCompute(masked_busy_parking, cv::noArray(), keypoints_with_cars, descriptors_with_cars);
 
-    sift->detectAndCompute(empty_parking, cv::noArray(), keypoints_empty, descriptors_empty);
-    sift->detectAndCompute(masked_busy_parking, cv::noArray(), keypoints_with_cars, descriptors_with_cars);
-
-    cv::FlannBasedMatcher matcher;
-    std::vector<cv::DMatch> matches;
-    matcher.match(descriptors_empty, descriptors_with_cars, matches);
-
-    double max_dist = 0;
-    double min_dist = 100;
-    for (int i = 0; i < descriptors_empty.rows; i++) {
-        double dist = matches[i].distance;
-        if (dist < min_dist) min_dist = dist;
-        if (dist > max_dist) max_dist = dist;
-    }
-
-    std::vector<cv::DMatch> good_matches;
-    for (int i = 0; i < descriptors_empty.rows; i++) {
-        if (matches[i].distance <= std::max(2 * min_dist, 0.02)) {
-            good_matches.push_back(matches[i]);
+        if (descriptors_empty.empty() || descriptors_with_cars.empty()) {
+            std::cerr << "Error: Descriptors are empty." << std::endl;
+            return cv::Mat(); // Return an empty mask if descriptors are empty
         }
-    }
 
-    // Step 3: Affinamento della maschera preliminare usando i punti chiave non corrispondenti
-    cv::Mat mask = starting_mask.clone(); // Usa la maschera dalla sottrazione come base
+        cv::FlannBasedMatcher matcher;
+        std::vector<cv::DMatch> matches;
+        matcher.match(descriptors_empty, descriptors_with_cars, matches);
 
-    // Trova i punti chiave nell'immagine con le auto che non hanno una buona corrispondenza
-    for (int i = 0; i < keypoints_with_cars.size(); i++) {
-        bool has_match = false;
-        for (const auto &match: good_matches) {
-            if (match.trainIdx == i) {
-                has_match = true;
-                break;
+
+        double max_dist = 0;
+        double min_dist = 100;
+        for (int i = 0; i < descriptors_empty.rows; i++) {
+            double dist = matches[i].distance;
+            if (dist < min_dist) min_dist = dist;
+            if (dist > max_dist) max_dist = dist;
+        }
+
+
+        std::vector<cv::DMatch> good_matches;
+        for (int i = 0; i < descriptors_empty.rows; i++) {
+            if (matches[i].distance <= std::max(2 * min_dist, 0.02)) {
+                good_matches.push_back(matches[i]);
             }
         }
-        if (!has_match) {
-            // Affina la maschera aggiungendo i punti chiave che non corrispondono
-            cv::circle(mask, keypoints_with_cars[i].pt, 5, cv::Scalar(255), cv::FILLED);
+
+        // Step 3: Affinamento della maschera preliminare usando i punti chiave non corrispondenti
+        cv::Mat mask = starting_mask.clone(); // Usa la maschera dalla sottrazione come base
+
+        // Trova i punti chiave nell'immagine con le auto che non hanno una buona corrispondenza
+        for (int i = 0; i < keypoints_with_cars.size(); i++) {
+            bool has_match = false;
+            for (const auto &match: good_matches) {
+                if (match.trainIdx == i) {
+                    has_match = true;
+                    break;
+                }
+            }
+            if (!has_match) {
+                // Affina la maschera aggiungendo i punti chiave che non corrispondono
+                cv::circle(sift_mask, keypoints_with_cars[i].pt, 5, cv::Scalar(255), cv::FILLED);
+            }
         }
-    }
 
-    // Affinamento finale della maschera
-    cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(20, 20)));
-    cv::morphologyEx(mask, mask, cv::MORPH_CLOSE,
-                     cv::getStructuringElement(cv::MORPH_RECT, cv::Size(15, 15))); // Rimuove i buchi
-    cv::morphologyEx(mask, mask, cv::MORPH_OPEN, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(30,
-                                                                                                    30)));// Ulteriori operazioni morfologiche
-    mask = smallContoursElimination(mask);
-
-    return mask;
+        // Affinamento finale della maschera
+        cv::morphologyEx(sift_mask, sift_mask, cv::MORPH_CLOSE, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(20, 20)));
+        cv::morphologyEx(sift_mask, sift_mask, cv::MORPH_CLOSE,cv::getStructuringElement(cv::MORPH_RECT, cv::Size(15, 15))); // Rimuove i buchi
+        cv::morphologyEx(sift_mask, sift_mask, cv::MORPH_OPEN, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(30, 30)));// Ulteriori operazioni morfologiche
+        sift_mask = smallContoursElimination(sift_mask);
+        return sift_mask;
 }
+
 
 cv::Mat Segmentation::grabCutMask(const cv::Mat& input_mask, const cv::Mat& input_img) {
     cv::Mat grabcut_mask = input_mask.clone();
     cv::Mat start = input_img.clone();
+    cv::Mat grabcut_partial;
+
+
 
     grabcut_mask.setTo(cv::GC_BGD, grabcut_mask == 0);
     grabcut_mask.setTo(cv::GC_PR_FGD, grabcut_mask == 255);
 
+
     cv::Mat bgdModel, fgdModel;
 
+    std::cout << "Starting GrabCut..." << std::endl;
     try {
         cv::grabCut(start, grabcut_mask, cv::Rect(), bgdModel, fgdModel, 30, cv::GC_INIT_WITH_MASK);
-        start.copyTo(start, grabcut_mask);
-        cv::grabCut(start, grabcut_mask, cv::Rect(), bgdModel, fgdModel, 30, cv::GC_INIT_WITH_MASK);
+        start.copyTo(grabcut_partial, grabcut_mask);
+        cv::grabCut(grabcut_partial, grabcut_mask, cv::Rect(), bgdModel, fgdModel, 30, cv::GC_INIT_WITH_MASK);
     }
     catch (const cv::Exception &e) {
         std::cout << "no foreground detected" << std::endl;
     }
+    std::cout << "GrabCut OK" << std::endl;
+
     cv::compare(grabcut_mask, cv::GC_PR_FGD, grabcut_mask, cv::CMP_EQ);
     // Filtro dei contorni per dimensione
     cv::morphologyEx(grabcut_mask, grabcut_mask, cv::MORPH_CLOSE, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(15, 15)));
@@ -142,7 +155,7 @@ cv::Mat Segmentation::grabCutMask(const cv::Mat& input_mask, const cv::Mat& inpu
 
     grabcut_mask = smallContoursElimination(grabcut_mask);
 
-    cv::Mat fgMask = cv::Mat::zeros(start.size(), start.type());
+    cv::Mat fgMask = cv::Mat::zeros(start.size(), CV_8UC3);
     for (int x = 0; x < start.rows; x++) {  // Iterate over rows (height)
         for (int y = 0; y < start.cols; y++) {  // Iterate over columns (width)
             if ((int) grabcut_mask.at<uchar>(cv::Point(y, x)) == 255) {
@@ -156,42 +169,35 @@ cv::Mat Segmentation::grabCutMask(const cv::Mat& input_mask, const cv::Mat& inpu
             }
         }
     }
-
-    return  grabcut_mask;
+    return fgMask;
 }
 
 
 
-Segmentation::Segmentation(const std::filesystem::path &emptyFramesDir, const std::filesystem::path &FramesDir) {
-    for (const auto &iter: std::filesystem::directory_iterator(FramesDir)){
-        std::string imgPathBusy = iter.path().string();
-        cv::Mat parking_with_cars_col = cv::imread(imgPathBusy);
+Segmentation::Segmentation(const std::filesystem::path &emptyFramesDir, const std::string& imageName) {
+        cv::Mat parking_with_cars_col = cv::imread(imageName);
         cv::Mat parking_with_cars;
         cv::cvtColor(parking_with_cars_col, parking_with_cars, cv::COLOR_BGR2GRAY);
         cv::Mat src_clean = parking_with_cars_col.clone();//used only for final mask application
-
         cv::Mat mask;
         cv::Mat empty_parking = averageEmptyImages(emptyFramesDir);
+        cv::Mat parking_masked;
 
         mask = backgroundSubtractionMask(empty_parking, parking_with_cars);
+        parking_with_cars.copyTo(parking_masked, mask);
 
-        parking_with_cars.copyTo(parking_with_cars, mask);
-
-        mask = siftMaskEnhancement(mask, empty_parking, parking_with_cars);
-
+        mask = siftMaskEnhancement(mask, empty_parking, parking_masked);
         parking_with_cars_col.copyTo(parking_with_cars_col, mask);
 
         //parking_with_cars_col = ImageProcessing::applyCLAHE(parking_with_cars_col);
         ImageProcessing::adjustContrast(parking_with_cars_col, 2, -50);
-
         mask = grabCutMask(mask, parking_with_cars_col);
-
         addWeighted(mask, 1, src_clean, 0.5, 0, src_clean);
 
         cv::imshow("segmentation", src_clean);
 
         cv::waitKey(0);
-    }
+
 }
 
 

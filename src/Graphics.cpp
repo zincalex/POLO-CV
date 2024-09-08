@@ -56,16 +56,17 @@ std::vector<cv::RotatedRect> Graphics::getBoxes() {
     // Section 2: (center set, double row of parking spaces with different angles, special parameters are used to handle the more extreme inclination)
     int yOffsetMiddle = yOffsetTop + parkingHeight + 60;
     int xOffsetMiddle = 120;
-    int numParkingMiddle = 8;
+    int numParkingMiddleTop = 8;
+    int numParkingMiddleBottom = 9;
     float angleMiddleTop = 45.0f;
     float angleMiddleBottom = -45.0f;
     horizontalOffsetAdjustment = -45;
     verticalOffsetAdjustment = 20;
     // Draw upper row of center set
-    getParkingRow(rectangles, numParkingMiddle, angleMiddleTop, xOffsetMiddle, horizontalOffsetAdjustment,yOffsetMiddle, verticalOffsetAdjustment,parkingWidth, parkingHeight, spacing,20,true, false);
+    getParkingRow(rectangles, numParkingMiddleTop, angleMiddleTop, xOffsetMiddle, horizontalOffsetAdjustment,yOffsetMiddle, verticalOffsetAdjustment,parkingWidth, parkingHeight, spacing,20,true, false);
 
     // Draw lower row of center set
-    getParkingRow(rectangles, numParkingMiddle, -angleMiddleBottom, xOffsetMiddle, horizontalOffsetAdjustment,yOffsetMiddle, verticalOffsetAdjustment,parkingWidth, parkingHeight, spacing, 20,true, true);
+    getParkingRow(rectangles, numParkingMiddleBottom, -angleMiddleBottom, xOffsetMiddle, horizontalOffsetAdjustment,yOffsetMiddle, verticalOffsetAdjustment,parkingWidth, parkingHeight, spacing, 20,true, true);
 
     // Section 3: (lower set, double row of parking spaces)
     int yOffsetBottom = yOffsetMiddle + parkingHeight * 2 + 50;
@@ -88,7 +89,7 @@ std::vector<cv::RotatedRect> Graphics::getBoxes() {
 
 cv::Mat Graphics::drawMap(const std::vector<cv::RotatedRect> &parkingSpaces) {
     //define dimensions of original map and create a matrix with white background
-    int width = 900;
+    int width = 950;
     int height = 750;
 
     cv::Mat parkingMap(height, width, CV_8UC3, cv::Scalar(255, 255, 255));

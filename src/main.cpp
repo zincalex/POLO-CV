@@ -67,7 +67,8 @@ int main(int argc, char** argv) {
         std::cout << "mAP: " << metrics.calculateMeanAveragePrecisionParkingSpaceLocalization() << std::endl;
         // Segmentation
 
-        //Segmentation seg = Segmentation(pathSequence0FramesDir, pathSequenceFramesDir);
+        Segmentation seg = Segmentation(pathSequence0FramesDir, imgPath);
+
 
         // Second Metric
 

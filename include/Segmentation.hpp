@@ -15,7 +15,7 @@
 
 class Segmentation {
 public:
-    Segmentation(const std::filesystem::path& emptyFramesDir, const std::filesystem::path& FramesDir);
+    Segmentation(const std::filesystem::path& emptyFramesDir, const std::string& imageName);
 
 
 

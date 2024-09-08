@@ -641,31 +641,6 @@ void ParkingSpaceDetector::adjustPerspective(std::vector<cv::RotatedRect>& rects
 }
 
 
-
-// TODO eliminate
-void drawRotatedRects(cv::Mat& image, const std::vector<cv::RotatedRect>& rotatedRects) {
-    // Define the color for the border (Red)
-    cv::Scalar redColor(0, 0, 255);  // BGR format, so (0, 0, 255) is red
-
-    for (const cv::RotatedRect& rect : rotatedRects) {
-        // Get the 4 vertices of the rotated rectangle
-        cv::Point2f vertices[4];
-        rect.points(vertices);
-
-        // Convert the vertices to integer points (required by polylines)
-        std::vector<cv::Point> intVertices(4);
-        for (int i = 0; i < 4; i++) {
-            intVertices[i] = vertices[i];
-        }
-
-        // Draw the rectangle with a red border
-        cv::polylines(image, intVertices, true, redColor, 2);  // Thickness of 2
-    }
-}
-
-
-
-
 ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFramesDir) {
     // PARAMETERS
     // Main angle ranges of the parking lines (can be adjusted accordingly)
@@ -736,8 +711,8 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
         // Remove rotated rects outliers
         removeOutliers(rotatedRects, PARKING_SPACE_LINES_ANGLES, imgSize, MARGIN, ASPECT_RATIO_THRESHOLDS);
 
-        /*// TODO Eliminate
-        drawRotatedRects(clone, rotatedRects);
+        // TODO Eliminate
+        /*Graphics::drawRotatedRects(clone, rotatedRects);
         cv::imshow("Rotated Rectangles", clone);
         cv::waitKey(0);*/
 
@@ -794,6 +769,7 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
         BoundingBox bbox = BoundingBox(*iterRectHighestBR, parkNumber++);
         bBoxes.push_back(bbox);
         finalBoundingBoxes.erase(iterRectHighestBR);
+
 
         // Look for the connected/close parking spaces
         bool foundIntersecting;

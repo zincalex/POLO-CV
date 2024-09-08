@@ -1,6 +1,6 @@
 #include "../include/ImageProcessing.hpp"
 
-cv::Mat ImageProcessing::createROI(const cv::Mat& input, const bool& obscure) { // We focus the analysis of the image on the parking lots
+/*cv::Mat ImageProcessing::createROI(const cv::Mat& input, const bool& obscure) { // We focus the analysis of the image on the parking lots
     cv::Mat mask = cv::Mat::zeros(input.size(), CV_8UC1);
     cv::Mat result = cv::Mat::zeros(input.size(), input.type());
 
@@ -29,6 +29,38 @@ cv::Mat ImageProcessing::createROI(const cv::Mat& input, const bool& obscure) { 
                 result.at<cv::Vec3b>(y, x) = input.at<cv::Vec3b>(y, x);
 
     return input;
+}*/
+
+
+cv::Mat ImageProcessing::createROI(const cv::Mat& image, const BoundingBox& bBox) {
+    // Get the rotated rectangle from the bounding box
+    cv::RotatedRect rotatedRect(bBox.getCenter(), bBox.getSize(), bBox.getAngle());
+
+    cv::Point2f vertices[4];
+    rotatedRect.points(vertices);
+
+    // Get the bounding rectangle of the rotated rectangle
+    cv::Rect boundingRect = rotatedRect.boundingRect();
+
+    // Define the destination points for perspective transformation
+    cv::Point2f dstPoints[4] = {
+            cv::Point2f(0, 0),                                              // Top-left corner
+            cv::Point2f(boundingRect.width - 1, 0),                         // Top-right corner
+            cv::Point2f(boundingRect.width - 1, boundingRect.height - 1),   // Bottom-right corner
+            cv::Point2f(0, boundingRect.height - 1)                         // Bottom-left corner
+    };
+
+    // Get the perspective transformation matrix
+    cv::Mat perspectiveMatrix = cv::getPerspectiveTransform(vertices, dstPoints);
+
+    // Apply the perspective transformation to get the warped image
+    cv::Mat warpedImage;
+    cv::warpPerspective(image, warpedImage, perspectiveMatrix, boundingRect.size());
+
+    cv::Mat flippedImage;
+    cv::flip(warpedImage, flippedImage, 0);  // 0 means flipping around the x-axis
+
+    return flippedImage; // Return the warped (straightened) image
 }
 
 
@@ -112,7 +144,8 @@ cv::Mat ImageProcessing::morphologicalSkeleton(const cv::Mat& binaryImg) {
     return skeleton;
 }
 
-cv::Mat applyCLAHE(const cv::Mat& input){
+
+cv::Mat ImageProcessing::applyCLAHE(const cv::Mat& input){
     cv::Mat CLAHEimage;
     cv::cvtColor(input, CLAHEimage, cv::COLOR_BGR2Lab);
     std::vector<cv::Mat> lab_planes(3);
@@ -135,4 +168,23 @@ cv::Mat applyCLAHE(const cv::Mat& input){
     cv::Mat clahe_bgr_image;
     cv::cvtColor(lab_clahe_image, clahe_bgr_image, cv::COLOR_Lab2BGR);
     return clahe_bgr_image;
+}
+
+
+cv::Mat ImageProcessing::createMaskDarkColors(const cv::Mat& image) {
+    cv::Mat mask = cv::Mat::zeros(image.size(), CV_8U);
+
+    for (int y = 0; y < image.rows; ++y) {
+        for (int x = 0; x < image.cols; ++x) {
+            cv::Vec3b bgrPixel = image.at<cv::Vec3b>(y, x);
+
+            // Check if all BGR components are less than or equal to 30
+            if (bgrPixel[0] <= 30 && bgrPixel[1] <= 30 && bgrPixel[2] <= 30) {
+                mask.at<uchar>(y, x) = 255;
+            } else {
+                mask.at<uchar>(y, x) = 0;
+            }
+        }
+    }
+    return mask;
 }

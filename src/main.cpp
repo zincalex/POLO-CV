@@ -7,6 +7,7 @@
 #include "../include/ParkingLotStatus.hpp"
 #include "../include/XMLReader.hpp"
 #include "../include/Segmentation.hpp"
+#include "../include/Metrics.hpp"
 
 bool checkDirectory(const std::filesystem::path& dirPath, const std::string& dirName) {
     if (!std::filesystem::exists(dirPath) || !std::filesystem::is_directory(dirPath)) {
@@ -56,14 +57,17 @@ int main(int argc, char** argv) {
         cv::Mat parkingImg = cv::imread(imgPath);
         ParkingLotStatus parkingStatus = ParkingLotStatus(parkingImg, bBoxes);
 
-        parkingStatus.drawParkingLotStatus();
-        cv::imshow("sss", parkingStatus.getStatusImage());
+        cv::imshow("Status", parkingStatus.seeParkingLotStatus());
         cv::waitKey(0);
 
         // First Metric
+        cv::Mat zero;
+        Metrics metrics = Metrics(groundTruth.getBBoxes(), parkingStatus.getStatusPredictions(), zero);
 
+        std::cout << "mAP: " << metrics.calculateMeanAveragePrecisionParkingSpaceLocalization() << std::endl;
         // Segmentation
-        Segmentation seg = Segmentation(pathSequence0FramesDir, pathSequenceFramesDir);
+
+        //Segmentation seg = Segmentation(pathSequence0FramesDir, pathSequenceFramesDir);
 
         // Second Metric
 

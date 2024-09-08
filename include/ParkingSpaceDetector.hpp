@@ -1,8 +1,9 @@
 #ifndef PARKINGSPACEDETECTION_HPP
 #define PARKINGSPACEDETECTION_HPP
 
-#include "../include/BoundingBox.hpp"
-#include "../include/ImageProcessing.hpp"
+#include "BoundingBox.hpp"
+#include "ImageProcessing.hpp"
+#include "Graphics.hpp"
 
 #include <vector>
 #include <iostream>

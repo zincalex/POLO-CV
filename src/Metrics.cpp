@@ -25,33 +25,26 @@ double calculateIoU(const cv::RotatedRect& rect1, const cv::RotatedRect& rect2) 
     return intersectionArea / (area1 + area2 - intersectionArea);
 }
 
-
-
-Metrics::Metrics(const std::vector<BoundingBox>& groundTruth, const std::vector<BoundingBox>& bBoxesPrediction) {
-    const double RADIUS = 45.0;
+double Metrics::calculateMeanAveragePrecisionParkingSpaceLocalization() const {
+    const double RADIUS = 35.0;
     const double IOU_THRESHOLD = 0.5;
 
-    std::vector<std::vector<double>> recalls;
-    std::vector<std::vector<double>> precisions;
+    std::vector<std::vector<double>> recalls(2);
+    std::vector<std::vector<double>> precisions(2);
     std::vector<double> recall_levels = {0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0};
 
     std::vector<double> average_precision(2, 0);
 
-
-    totBoundingBoxes = bBoxesPrediction.size();
-
-    std::vector<std::vector<BoundingBox>> sortedPredictionBoxes;
-    std::vector<std::vector<BoundingBox>> sortedGroundTruth;
-
     // Divide the classification in the 2 classes -----> 0 no car, 1  car
+    std::vector<std::vector<BoundingBox>> sortedPredictionBoxes(2);
+    std::vector<std::vector<BoundingBox>> sortedGroundTruth(2);
     for (const BoundingBox& bBox : bBoxesPrediction)
         bBox.isOccupied() ? sortedPredictionBoxes[1].push_back(bBox) : sortedPredictionBoxes[0].push_back(bBox);
     for (const BoundingBox& trueBox : groundTruth)
         trueBox.isOccupied() ? sortedGroundTruth[1].push_back(trueBox): sortedGroundTruth[0].push_back(trueBox);
 
 
-
-
+    
     // Calculate the cumulative precisions and recalls for each class
     for (int i = 0; i < 1; i++) {
         unsigned int totalGroundTruths = sortedGroundTruth[i].size();
@@ -101,4 +94,15 @@ Metrics::Metrics(const std::vector<BoundingBox>& groundTruth, const std::vector<
     for (int i = 0; i < 2; i++)
         mean += average_precision[i];
     mean /= 2;
+
+    return mean;
+}
+
+
+
+Metrics::Metrics(const std::vector<BoundingBox>& groundTruth, const std::vector<BoundingBox>& bBoxesPrediction, const cv::Mat& segmentationColorMask) {
+    this->groundTruth = groundTruth;
+    this->bBoxesPrediction = bBoxesPrediction;
+    this->segmentationColorMask = segmentationColorMask;
+    totBoundingBoxes = bBoxesPrediction.size();
 }

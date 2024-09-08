@@ -4,16 +4,19 @@
 #include <vector>
 #include <algorithm>
 #include <numeric>
-#include "../include/BoundingBox.hpp"
+#include "iostream"
+#include "BoundingBox.hpp"
 
 class Metrics {
 public:
-    Metrics(const std::vector<BoundingBox>& groundTruth, const std::vector<BoundingBox>& bBoxesPrediction);
+    Metrics(const std::vector<BoundingBox>& groundTruth, const std::vector<BoundingBox>& bBoxesPrediction, const cv::Mat& segmentationColorMask);
 
-    double computeMeanAveragePrecision() const;
+    double calculateMeanAveragePrecisionParkingSpaceLocalization() const;
 
 private:
-
+    std::vector<BoundingBox> groundTruth;
+    std::vector<BoundingBox> bBoxesPrediction;
+    cv::Mat segmentationColorMask;
 
     int totBoundingBoxes;
 };

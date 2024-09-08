@@ -142,3 +142,25 @@ void Graphics::mapOverlay(cv::Mat &src, const cv::Mat& map) {
     cv::Rect mapROI(x_pos, y_pos, mapLocal.cols, mapLocal.rows);
     mapLocal.copyTo(src(mapROI));
 }
+
+
+
+void Graphics::drawRotatedRects(cv::Mat& image, const std::vector<cv::RotatedRect>& rotatedRects) {
+    // Define the color for the border (Red)
+    cv::Scalar redColor(0, 0, 255);  // BGR format, so (0, 0, 255) is red
+
+    for (const cv::RotatedRect& rect : rotatedRects) {
+        // Get the 4 vertices of the rotated rectangle
+        cv::Point2f vertices[4];
+        rect.points(vertices);
+
+        // Convert the vertices to integer points (required by polylines)
+        std::vector<cv::Point> intVertices(4);
+        for (int i = 0; i < 4; i++) {
+            intVertices[i] = vertices[i];
+        }
+
+        // Draw the rectangle with a red border
+        cv::polylines(image, intVertices, true, redColor, 2);  // Thickness of 2
+    }
+}

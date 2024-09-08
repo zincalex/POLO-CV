@@ -99,7 +99,7 @@ cv::Mat Graphics::drawMap(const std::vector<cv::RotatedRect> &parkingSpaces) {
         parkingSpace.points(vertices);
 
         for (int i = 0; i < 4; i++) {
-            cv::line(parkingMap, vertices[i], vertices[(i + 1) % 4], cv::Scalar(51, 36, 4), 5);
+            cv::line(parkingMap, vertices[i], vertices[(i + 1) % 4], cv::Scalar(51, 36, 4), 20);
         }
         //std::string number = std::to_string(i);
         //cv::putText(parkingMap, number, parkingSpaces[i].center, cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0,0,0), 2);
@@ -109,11 +109,11 @@ cv::Mat Graphics::drawMap(const std::vector<cv::RotatedRect> &parkingSpaces) {
 
 
 void Graphics::fillRotatedRectsWithCar(cv::Mat &image, const std::vector<cv::RotatedRect> &rectangles,
-                                       const std::vector<int> &carIndices) {
+                                       const std::vector<unsigned short> &carIndices) {
     for (size_t i = 0; i < rectangles.size(); ++i) {
         std::set<int> greenIndexesSet(carIndices.begin(), carIndices.end());
         // If index is found (car parked in the space) rectangle is filled with red or with blue if empty
-        cv::Scalar color = (greenIndexesSet.find(i) != greenIndexesSet.end()) ? cv::Scalar(0, 0, 255) : cv::Scalar(130, 96, 21);
+        cv::Scalar color = (greenIndexesSet.find(i+1) != greenIndexesSet.end()) ? cv::Scalar(0, 0, 255) : cv::Scalar(130, 96, 21);
 
         cv::Point2f vertices[4];
         rectangles[i].points(vertices);
@@ -164,4 +164,14 @@ void Graphics::drawRotatedRects(cv::Mat& image, const std::vector<cv::RotatedRec
         // Draw the rectangle with a red border
         cv::polylines(image, intVertices, true, redColor, 2);  // Thickness of 2
     }
+}
+
+void Graphics::applyMap(const std::string &imageName, const std::vector<unsigned short> &occupiedParkingSpaces) {
+    cv::Mat src = cv::imread(imageName);
+    std::vector<cv::RotatedRect> rectangles = getBoxes();
+    cv::Mat mapImage = drawMap(rectangles);
+    fillRotatedRectsWithCar(mapImage, rectangles, occupiedParkingSpaces);
+    mapOverlay(src, mapImage);
+    cv::imshow("2DMap", src);
+    cv::waitKey(0);
 }

@@ -9,9 +9,12 @@
 
 #include "filesystem"
 #include "vector"
+#include <iostream>
 
 #include "opencv2/imgproc.hpp"
 #include "opencv2/highgui.hpp"
+#include <opencv2/features2d.hpp>
+
 
 class Segmentation {
 public:

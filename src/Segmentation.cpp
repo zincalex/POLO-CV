@@ -2,9 +2,6 @@
 // Created by trigger on 9/6/24.
 //
 
-#include <opencv2/features2d.hpp>
-#include <iostream>
-#include <opencv2/imgproc.hpp>
 #include "../include/Segmentation.hpp"
 
 

@@ -45,7 +45,6 @@ XMLReader::XMLReader(const std::string& filename) {
         cv::Size size(width, height);
         cv::RotatedRect rRect(center, size, static_cast<float>(angle));
 
-
         BoundingBox bBox(rRect, counter++, occupied);
         bBoxes.push_back(bBox);
 

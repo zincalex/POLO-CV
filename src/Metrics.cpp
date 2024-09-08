@@ -26,7 +26,7 @@ double calculateIoU(const cv::RotatedRect& rect1, const cv::RotatedRect& rect2) 
 }
 
 double Metrics::calculateMeanAveragePrecisionParkingSpaceLocalization() const {
-    const double RADIUS = 35.0;
+    const double RADIUS = 45.0;
     const double IOU_THRESHOLD = 0.5;
 
     std::vector<std::vector<double>> recalls(2);
@@ -44,9 +44,9 @@ double Metrics::calculateMeanAveragePrecisionParkingSpaceLocalization() const {
         trueBox.isOccupied() ? sortedGroundTruth[1].push_back(trueBox): sortedGroundTruth[0].push_back(trueBox);
 
 
-    
+
     // Calculate the cumulative precisions and recalls for each class
-    for (int i = 0; i < 1; i++) {
+    for (unsigned int i = 0; i < 2; ++i) {
         unsigned int totalGroundTruths = sortedGroundTruth[i].size();
         unsigned int truePositives = 0;
         unsigned int falsePositives = 0;
@@ -56,8 +56,9 @@ double Metrics::calculateMeanAveragePrecisionParkingSpaceLocalization() const {
 
                 // Same parking spot
                 if (isWithinRadius(predictBBox.getCenter(), trueBBox.getCenter(), RADIUS)) {
-
+                    std::cout << "Pred box  " << predictBBox.getNumber() << " matched with ground truth " << trueBBox.getNumber() << std::endl;
                     double iou = calculateIoU(predictBBox.getRotatedRect(), trueBBox.getRotatedRect());
+                    std::cout << "IOU: " << iou << std::endl;
                     (iou >= IOU_THRESHOLD) ? truePositives++ : falsePositives++;
                     precisions[i].push_back(truePositives / (truePositives + falsePositives));
                     recalls[i].push_back(truePositives / totalGroundTruths);
@@ -86,6 +87,8 @@ double Metrics::calculateMeanAveragePrecisionParkingSpaceLocalization() const {
             ap += max_precision;  // Store the maximum precision for this recall level
         }
         average_precision[i] = ap / 11.0;   // 11 Point Interpolation Method
+
+        std::cout << "avgP: " << average_precision[i] << std::endl;
     }
 
 

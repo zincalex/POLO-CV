@@ -6,7 +6,7 @@
 #include <sstream>
 #include <string>
 
-#include "../include/BoundingBox.hpp"
+#include "BoundingBox.hpp"
 
 
 class XMLReader {

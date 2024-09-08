@@ -5,7 +5,7 @@
 
 class BoundingBox {
 public:
-    BoundingBox(const cv::RotatedRect& rect, const unsigned short& number, const bool& occupied = true);
+    BoundingBox(const cv::RotatedRect& rect, const unsigned short& number, const bool& occupied = false);
 
     void updateState();
 

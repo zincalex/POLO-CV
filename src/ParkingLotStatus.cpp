@@ -49,8 +49,6 @@ ParkingLotStatus::ParkingLotStatus(const cv::Mat& parkingImage, std::vector<Boun
 
     this->parkingImage = parkingImage;
     for (BoundingBox& bBox : bBoxes) {
-        this->bBoxes.push_back(bBox);
-
         const double GAMMA = 1.25;
         const unsigned int SATURATION_THRESHOLD = 150;
         const unsigned int WHITENESS_THRESHOLD = 150;
@@ -71,7 +69,6 @@ ParkingLotStatus::ParkingLotStatus(const cv::Mat& parkingImage, std::vector<Boun
         if(isCar(whiteness, totalPixels, 22.0)) {
             if (DEBUG) std::cout << "is a car" << std::endl;
             bBox.updateState();
-            this->bBoxes.push_back(bBox);
             if (DEBUG) cv::waitKey(0);
             continue;
         }
@@ -84,7 +81,6 @@ ParkingLotStatus::ParkingLotStatus(const cv::Mat& parkingImage, std::vector<Boun
             if(isCar(saturation, totalPixels, 15.0)) {
                 if (DEBUG) std::cout << "is a car" << std::endl;
                 bBox.updateState();
-                this->bBoxes.push_back(bBox);
                 if (DEBUG) cv::waitKey(0);
                 continue;
             }
@@ -95,7 +91,6 @@ ParkingLotStatus::ParkingLotStatus(const cv::Mat& parkingImage, std::vector<Boun
                 if(isCar(black, totalPixels, 10.0)) {
                     if (DEBUG) std::cout << "is a car" << std::endl;
                     bBox.updateState();
-                    this->bBoxes.push_back(bBox);
                     if (DEBUG) cv::waitKey(0);
                     continue;
                 }
@@ -128,12 +123,10 @@ ParkingLotStatus::ParkingLotStatus(const cv::Mat& parkingImage, std::vector<Boun
                     if(numFeatures >= 25) {
                         if (DEBUG) std::cout << "is a car" << std::endl;
                         bBox.updateState();
-                        this->bBoxes.push_back(bBox);
                         if (DEBUG) cv::waitKey(0);
                         continue;
                     }
                     else {
-                        this->bBoxes.push_back(bBox);
                         if (DEBUG) std::cout << "not a car" << std::endl;
                     }
                 }
@@ -143,5 +136,5 @@ ParkingLotStatus::ParkingLotStatus(const cv::Mat& parkingImage, std::vector<Boun
         if (DEBUG) std::cout << "-----------" << std::endl;
         if (DEBUG) cv::waitKey(0);
     }
-
+    this->bBoxes = bBoxes;
 }

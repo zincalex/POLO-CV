@@ -45,7 +45,7 @@ std::vector<cv::RotatedRect> Graphics::getBoxes() {
 
     // Section 1: (upper set, single row of parking spaces)
     int yOffsetTop = 80;
-    int xOffsetTop = 320;  // Moves the spaces from the extreme left to the desired positions
+    int xOffsetTop = 525;  // Moves the spaces from the extreme left to the desired positions
     int numParkingTop = 5;
     float horizontalOffsetAdjustment = 0;
     float verticalOffsetAdjustment = 0;
@@ -108,13 +108,19 @@ cv::Mat Graphics::drawMap(const std::vector<cv::RotatedRect> &parkingSpaces) {
 }
 
 
-void Graphics::fillRotatedRectsWithCar(cv::Mat &image, const std::vector<cv::RotatedRect> &rectangles,
+void Graphics::fillRotatedRectsWithCar(cv::Mat &empty_map, const std::vector<cv::RotatedRect> &rectangles,
                                        const std::vector<unsigned short> &carIndices) {
+
+    const cv::Scalar PARKING_OCCUPIED = cv::Scalar(0, 0, 255);
+    const cv::Scalar PARKING_BUSY = cv::Scalar(130, 96, 21);
+    const cv::Scalar BLACK = cv::Scalar(0, 0, 0);
+    const cv::Scalar WHITE = cv::Scalar(255, 255, 255);
+
     for (size_t i = 0; i < rectangles.size(); ++i) {
         std::set<int> greenIndexesSet(carIndices.begin(), carIndices.end());
         // If index is found (car parked in the space) rectangle is filled with red or with blue if empty
-        cv::Scalar color = (greenIndexesSet.find(i+1) != greenIndexesSet.end()) ? cv::Scalar(0, 0, 255) : cv::Scalar(130, 96, 21);
-
+        cv::Scalar color = (greenIndexesSet.find(i+1) != greenIndexesSet.end()) ? PARKING_OCCUPIED : PARKING_BUSY;
+        color = (i > 36) ? BLACK : color;
         cv::Point2f vertices[4];
         rectangles[i].points(vertices);
 
@@ -124,8 +130,9 @@ void Graphics::fillRotatedRectsWithCar(cv::Mat &image, const std::vector<cv::Rot
         }
 
         std::vector<std::vector<cv::Point>> fillPoints = { points };
-        cv::fillPoly(image, fillPoints, color);
+        cv::fillPoly(empty_map, fillPoints, color);
     }
+
 }
 
 

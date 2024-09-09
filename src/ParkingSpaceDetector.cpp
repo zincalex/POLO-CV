@@ -797,7 +797,6 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
     // Build the bounding boxes
     unsigned short parkNumber = 1;
     while (!finalBoundingBoxes.empty() && parkNumber < 38) {
-        std::cout << parkNumber << std::endl;
         // Find the bounding box with the bottom-right corner with the highest y value
         auto iterRectHighestBR = std::max_element(finalBoundingBoxes.begin(), finalBoundingBoxes.end(),
                                                   [this](const cv::RotatedRect &a, const cv::RotatedRect &b) {

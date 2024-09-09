@@ -59,16 +59,16 @@ int main(int argc, char** argv) {
         cv::Mat clone = parkingImg.clone();
         std::cout << "Working on img : " << imgPath << std::endl;
         ParkingLotStatus parkingStatus = ParkingLotStatus(parkingImg, bBoxes);
-        ParkingLotStatus veritas = ParkingLotStatus(parkingImg, groundTruth.getBBoxes());
+        //ParkingLotStatus veritas = ParkingLotStatus(clone, groundTruth.getBBoxes());
 
 
         cv::imshow("Status", parkingStatus.seeParkingLotStatus());
-        cv::imshow("Veritas", veritas.seeParkingLotStatus());
+        //cv::imshow("Veritas", veritas.seeParkingLotStatus());
 
 
 
         // First Metric
-        cv::Mat zero;
+        cv::Mat zero = cv::Mat::zeros(10,10, CV_8UC3);
         Metrics metrics = Metrics(groundTruth.getBBoxes(), parkingStatus.getStatusPredictions(), zero);
 
         std::cout << "mAP: " << metrics.calculateMeanAveragePrecisionParkingSpaceLocalization() << std::endl;

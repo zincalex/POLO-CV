@@ -1,35 +1,19 @@
 #include "../include/ImageProcessing.hpp"
 
-/*cv::Mat ImageProcessing::createROI(const cv::Mat& input, const bool& obscure) { // We focus the analysis of the image on the parking lots
-    cv::Mat mask = cv::Mat::zeros(input.size(), CV_8UC1);
-    cv::Mat result = cv::Mat::zeros(input.size(), input.type());
+cv::Mat ImageProcessing::optinalAreaROI(const cv::Size& imgSize) {
+    cv::Mat mask = cv::Mat::zeros(imgSize, CV_8UC1);
 
     // Define ROI
-    std::vector<cv::RotatedRect> rois;
-    //rois.push_back(cv::RotatedRect(cv::Point(580, 317), cv::Size(771, 282), 58));
-    //rois.push_back(cv::RotatedRect(cv::Point(950, 192), cv::Size(165, 710), 128));
-    rois.push_back(cv::RotatedRect(cv::Point(1084, 83), cv::Size(452, 54), 28));
+    cv:: RotatedRect roiRect = cv::RotatedRect(cv::Point(1084, 83), cv::Size(452, 54), 28);
 
-    //black_rois.push_back(cv::RotatedRect(cv::Point(777, 343), cv::Size(1227, 125), 47));
-    //black_rois.push_back(cv::RotatedRect(cv::Point(861, 30), cv::Size(1042, 72), 32));
+    cv::Point2f vertices[4];
+    std::vector<cv::Point> contour;
+    roiRect.points(vertices);
+    for (auto vertex : vertices) { contour.push_back(vertex); }
+    cv::fillConvexPoly(mask, contour, cv::Scalar(255));
 
-    for (const auto& roiRect : rois) {
-        cv::Point2f vertices[4];    // Using cv::Point2f, insted of cv::Point, because it enables the .points method later
-        std::vector<cv::Point> contour;
-
-        roiRect.points(vertices);    // Store the vertices of the ROI
-        for (auto vertex : vertices) { contour.push_back(vertex); }
-
-        obscure ? cv::fillConvexPoly(mask, contour, cv::Scalar(0)) : cv::fillConvexPoly(mask, contour, cv::Scalar(255));
-    }
-
-    for (int y = 0; y < mask.rows; y++)
-        for (int x = 0; x < mask.cols; x++)
-            if (mask.at<uchar>(y, x) == 255)
-                result.at<cv::Vec3b>(y, x) = input.at<cv::Vec3b>(y, x);
-
-    return input;
-}*/
+    return mask;
+}
 
 
 cv::Mat ImageProcessing::createRectsMask(const std::vector<cv::RotatedRect>& rotatedRects, const cv::Size& imgSize) {

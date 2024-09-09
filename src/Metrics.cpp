@@ -26,7 +26,7 @@ double calculateIoU(const cv::RotatedRect& rect1, const cv::RotatedRect& rect2) 
 
 double Metrics::calculateMeanAveragePrecisionParkingSpaceLocalization() const {
 
-    const bool DEBUG = true;
+    const bool DEBUG = false;
     const double IOU_THRESHOLD = 0.5;
 
     std::vector<int> totalGroundTruths = {0,0};
@@ -44,10 +44,14 @@ double Metrics::calculateMeanAveragePrecisionParkingSpaceLocalization() const {
     for (const BoundingBox& trueB : groundTruth)
         trueB.isOccupied() ? totalGroundTruths[1] += 1 : totalGroundTruths[0] += 1;
 
+    // Check the number of classes (in some sequence images, there are no car. Hence, it might happen that no cars are dected)
+    unsigned int numClasses;
+    (totalGroundTruths[0] > 0 && totalGroundTruths[1] > 0) ? numClasses = 2 : numClasses = 1;
+
 
     totalGroundTruths[0] -= 3; // TODO w8 for clarification
     // Calculate the cumulative precisions and recalls for each class
-    for (unsigned int i = 0; i < 2; ++i) {
+    for (unsigned int i = 0; i < numClasses; ++i) {
         unsigned int truePositives = 0;
         unsigned int falsePositives = 0;
 
@@ -91,7 +95,7 @@ double Metrics::calculateMeanAveragePrecisionParkingSpaceLocalization() const {
     }
 
     // For each class
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < numClasses; i++) {
         double ap = 0.0;
 
         // Iterate through each recall level
@@ -114,9 +118,9 @@ double Metrics::calculateMeanAveragePrecisionParkingSpaceLocalization() const {
 
     // Compute mAP
     double mean = 0.0;   // Initialize mean average precision
-    for (int i = 0; i < 2; i++)
+    for (int i = 0; i < numClasses; i++)
         mean += average_precision[i];
-    mean /= 2;
+    mean /= numClasses;
 
     return mean;
 }

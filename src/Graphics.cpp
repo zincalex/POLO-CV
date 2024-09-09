@@ -163,6 +163,7 @@ void Graphics::drawRotatedRects(cv::Mat& image, const std::vector<cv::RotatedRec
     }
 }
 
+
 void Graphics::applyMap(const std::string &imageName, const std::vector<unsigned short> &occupiedParkingSpaces) {
     cv::Mat src = cv::imread(imageName);
     std::vector<cv::RotatedRect> rectangles = getBoxes();

@@ -10,7 +10,7 @@ public:
     ImageProcessing() = delete;  // Prevent instantiation
 
 
-    /*static cv::Mat createROI(const cv::Mat& input, const bool& obscure);*/
+    static cv::Mat optinalAreaROI(const cv::Size& imgSize);
     static cv::Mat createRectsMask(const std::vector<cv::RotatedRect>& rotatedRects, const cv::Size& imgSize);
     static cv::Mat createROI(const cv::Mat& image, const BoundingBox& bBox);
 

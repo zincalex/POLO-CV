@@ -110,7 +110,14 @@ std::vector<cv::Vec4i> ParkingSpaceDetector::filterLines(std::vector<cv::Vec4i>&
         }
 
 
-        // 2 CONTROL : mean average color around my line
+        // 2 CONTROL : eliminate lines with bad angles
+        if (!((isInRange(angle1, FIRST_ANGLE_RANGE)) || (isInRange(angle1, SECOND_ANGLE_RANGE)))) {
+            keepLine[i] = false;
+            continue;
+        }
+
+
+        // 3 CONTROL : mean average color around my line
         cv::Point2f center = (start1 + end1) * 0.5;
         cv::Size2f rectSize(length1, 3);    // Small width for the rectangle (e.g., 3 pixels)
         cv::RotatedRect rotatedRect(center, rectSize, angle1);
@@ -139,11 +146,20 @@ std::vector<cv::Vec4i> ParkingSpaceDetector::filterLines(std::vector<cv::Vec4i>&
         }
 
 
-        // 3 CONTROL : eliminate lines with bad angles
-        if (!((isInRange(angle1, FIRST_ANGLE_RANGE)) || (isInRange(angle1, SECOND_ANGLE_RANGE)))) {
-            keepLine[i] = false;
-            continue;
+        // 4 CONTROL : remove lines that are in the optinal area
+        bool flag = false;
+        cv::Mat optinalAreaMask = ImageProcessing::optinalAreaROI(referenceImage.size());
+        cv::LineIterator it(optinalAreaMask, start1, end1, 8);  // Iterate through points along the line
+
+        for (unsigned int j = 0; j < it.count; ++j, ++it) {
+            if (optinalAreaMask.at<uchar>(it.pos()) == 255) {
+                keepLine[i] = false;
+                flag = true;
+                break;
+            }
         }
+        if (flag)
+            continue;
 
 
         // Comparison with other lines
@@ -158,7 +174,7 @@ std::vector<cv::Vec4i> ParkingSpaceDetector::filterLines(std::vector<cv::Vec4i>&
             double endDistance = calculatePointsDistance(end1, end2);
 
 
-            // 4 CONTROL : lines that start very close and end very close, with the same angle
+            // 5 CONTROL : lines that start very close and end very close, with the same angle
             if ((startDistance < proximityThresholds[0] || endDistance < proximityThresholds[0]) && areAnglesSimilar(angle1, angle2, angleThreshold)) {
                 keepLine[length1 >= length2 ? j : i] = false; // Keep the longest line
                 if (length1 < length2)
@@ -185,7 +201,7 @@ std::vector<cv::Vec4i> ParkingSpaceDetector::filterLines(std::vector<cv::Vec4i>&
             double angle2 = calculateLineAngle(lines[j]);
 
 
-            // 5 CONTROL : if end and start are close and angle is not similar discard it
+            // 6 CONTROL : if end and start are close and angle is not similar discard it
             if ((startDistance <= proximityThresholds[1] || endDistance <= proximityThresholds[1]) && !areAnglesSimilar(angle1, angle2, angleThreshold)) {
                 isInRange(angle1, SECOND_ANGLE_RANGE) ? keepLine[j] = false : keepLine[i] = false;
                 break;
@@ -319,7 +335,7 @@ std::vector<cv::RotatedRect> ParkingSpaceDetector::linesToRotatedRect(const std:
 }
 
 
-void ParkingSpaceDetector::InferRotatedRects(std::vector<cv::RotatedRect>& rotatedRects, std::pair<double, double> lineAngles) const {
+void ParkingSpaceDetector::InferRotatedRects(std::vector<cv::RotatedRect>& rotatedRects, std::pair<double, double> parkingSpaceAngles) const {
     std::vector<cv::RotatedRect> filteredY;
     std::vector<cv::RotatedRect> filteredDegrees;
     std::vector<cv::RotatedRect> generatingRects;
@@ -341,7 +357,7 @@ void ParkingSpaceDetector::InferRotatedRects(std::vector<cv::RotatedRect>& rotat
         }
 
         double angle = rotatedRects[i].angle;
-        if (isInRange(angle, lineAngles)) // Filter rectangles with angles between 3 and 35 degrees
+        if (isInRange(angle, parkingSpaceAngles)) // Filter rectangles with angles between 3 and 35 degrees
             filteredDegrees.push_back(rotatedRects[i]);
 
         if (bottomRight.y > 460 && bottomRight.y < 520 && bottomRight.x > 750 && bottomRight.x < 860) // Filter rectangles based on Y and X values
@@ -737,8 +753,12 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
             lines[i] = standardizeLine(lines[i]);
 
         // Filter the lines
-        std::vector<cv::Vec4i> filteredLines = filterLines(lines, input, PARKING_SPACE_LINES_ANGLES, PROXIMITY_THRESHOLDS, MIN_LINE_LENGTH, ANGLE_THRESHOLD, WHITENESS_THRESHOLD);
-        std::vector<std::pair<cv::Vec4i, cv::Vec4i>> matchedLines = matchLines(filteredLines, PARKING_SPACE_LINES_ANGLES, START_END_DISTANCE_THRESHOLD, END_START_DISTANCE_THRESHOLD, MAX_PARALLEL_ANGLE, DELTA_X_THRESHOLD, DELTA_Y_THRESHOLD);
+        std::vector<cv::Vec4i> filteredLines = filterLines(lines, input, PARKING_SPACE_LINES_ANGLES, PROXIMITY_THRESHOLDS,
+                                                           MIN_LINE_LENGTH, ANGLE_THRESHOLD, WHITENESS_THRESHOLD);
+
+        std::vector<std::pair<cv::Vec4i, cv::Vec4i>> matchedLines = matchLines(filteredLines, PARKING_SPACE_LINES_ANGLES,
+                                                                               START_END_DISTANCE_THRESHOLD, END_START_DISTANCE_THRESHOLD,
+                                                                               MAX_PARALLEL_ANGLE, DELTA_X_THRESHOLD, DELTA_Y_THRESHOLD);
 
         // Build the rotated rects
         std::vector<cv::RotatedRect> rotatedRects = linesToRotatedRect(matchedLines);
@@ -779,7 +799,8 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
 
     // Build the bounding boxes
     unsigned short parkNumber = 1;
-    while (!finalBoundingBoxes.empty() && parkNumber < 38) {
+    while (!finalBoundingBoxes.empty() && parkNumber < 38) { // at max there are 37 parking spaces, duplicates are already handled in removeOutliers
+
         // Find the bounding box with the bottom-right corner with the highest y value
         auto iterRectHighestBR = std::max_element(finalBoundingBoxes.begin(), finalBoundingBoxes.end(),
                                                   [this](const cv::RotatedRect &a, const cv::RotatedRect &b) {

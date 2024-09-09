@@ -32,6 +32,22 @@
 }*/
 
 
+cv::Mat ImageProcessing::createRectsMask(const std::vector<cv::RotatedRect>& rotatedRects, const cv::Size& imgSize) {
+    cv::Mat mask = cv::Mat::zeros(imgSize, CV_8UC1);
+    for (const cv::RotatedRect& rect : rotatedRects) {
+        cv::Point2f vertices[4];
+        rect.points(vertices);
+
+        std::vector<cv::Point> verticesVector(4);
+        for (unsigned int j = 0; j < 4; j++)
+            verticesVector[j] = vertices[j];
+        cv::fillPoly(mask, verticesVector, cv::Scalar(255));
+    }
+
+    return mask;
+}
+
+
 cv::Mat ImageProcessing::createROI(const cv::Mat& image, const BoundingBox& bBox) {
     // Get the rotated rectangle from the bounding box
     cv::RotatedRect rotatedRect(bBox.getCenter(), bBox.getSize(), bBox.getAngle());

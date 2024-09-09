@@ -447,23 +447,6 @@ void ParkingSpaceDetector::InferRotatedRects(std::vector<cv::RotatedRect>& rotat
 }
 
 
-cv::Mat ParkingSpaceDetector::createParkingLotMask(const std::vector<cv::RotatedRect>& rotatedRects, const cv::Size& imgSize) const {
-
-    cv::Mat mask = cv::Mat::zeros(imgSize, CV_8UC1);
-    for (const cv::RotatedRect& rect : rotatedRects) {
-        cv::Point2f vertices[4];
-        rect.points(vertices);
-
-        std::vector<cv::Point> verticesVector(4);
-        for (unsigned int j = 0; j < 4; j++)
-            verticesVector[j] = vertices[j];
-        cv::fillPoly(mask, verticesVector, cv::Scalar(255));
-    }
-
-    return mask;
-}
-
-
 std::pair<bool, bool> ParkingSpaceDetector::checkSides(const cv::RotatedRect& rotatedRect, const cv::Mat& mask, const int& margin, const cv::Size& imgSize) const {
     cv::Point2f vertices[4];
     rotatedRect.points(vertices);
@@ -519,7 +502,7 @@ void ParkingSpaceDetector::removeOutliers(std::vector<cv::RotatedRect>& rotatedR
     std::vector<bool> outlier(rotatedRects.size(), false);
 
     // Create the mask to see where the rotated rectangle are
-    cv::Mat mask = createParkingLotMask(rotatedRects, imgSize);
+    cv::Mat mask = ImageProcessing::createRectsMask(rotatedRects, imgSize);
 
     // OUTLIER ELIMINATION
     // First outliers : parking spaces detected between other parking spaces
@@ -679,7 +662,7 @@ void ParkingSpaceDetector::adjustPerspective(std::vector<cv::RotatedRect>& rects
         rect.center.y -= static_cast<unsigned int>(change / 2);
     }
 
-    cv::Mat rotatedRectMask = createParkingLotMask(rects, imgSize);
+    cv::Mat rotatedRectMask = ImageProcessing::createRectsMask(rects, imgSize);
     for (cv::RotatedRect& rect : rects) {
         if (isInRange(rect.angle, parkingSpaceAngles[0])) { // 5 - 20 range
             std::pair<bool, bool> touched = checkSides(rect, rotatedRectMask, margin+50, imgSize);

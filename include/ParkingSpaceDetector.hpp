@@ -19,7 +19,6 @@ class ParkingSpaceDetector {
 public:
     ParkingSpaceDetector(const std::filesystem::path& emptyFramesDir);
 
-    cv::Mat createParkingLotMask(const std::vector<cv::RotatedRect>& rotatedRects, const cv::Size& imgSize) const;
 
     std::vector<BoundingBox> getBBoxes() { return bBoxes; }
 

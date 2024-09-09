@@ -1,10 +1,5 @@
 #include "../include/Metrics.hpp"
 
-bool isWithinRadius(const cv::Point& predictedCenter, const cv::Point& trueCenter, const double& radius) {
-    double distance = std::sqrt(std::pow(predictedCenter.x - trueCenter.x, 2) + std::pow(predictedCenter.y - trueCenter.y, 2));
-    return distance <= radius;
-}
-
 double calculateIoU(const cv::RotatedRect& rect1, const cv::RotatedRect& rect2) {
     std::vector<cv::Point2f> vertices1(4);
     rect1.points(vertices1.data());
@@ -27,6 +22,7 @@ double calculateIoU(const cv::RotatedRect& rect1, const cv::RotatedRect& rect2) 
 
     return intersectionArea / (area1 + area2 - intersectionArea);
 }
+
 
 double Metrics::calculateMeanAveragePrecisionParkingSpaceLocalization() const {
 

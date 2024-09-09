@@ -44,7 +44,6 @@ cv::Mat Segmentation::smallContoursElimination(const cv::Mat& input_mask, const 
     in_mask = input_mask.clone();
     std::vector<std::vector<cv::Point>> contours;
     std::vector<cv::Vec4i> hierarchy;
-    cv::imshow("DEBUG", in_mask);
     cv::findContours(in_mask, contours, hierarchy, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
 // Filtro dei contorni per dimensione
@@ -111,7 +110,50 @@ cv::Mat Segmentation::getForegroundMaskMOG2(cv::Ptr<cv::BackgroundSubtractorMOG2
     return drawing;
 }
 
-Segmentation::Segmentation(const std::filesystem::path &emptyFramesDir, const std::string& imageName) {
+cv::Mat Segmentation::getBBoxMask(const std::vector<BoundingBox> &parkingBBoxes, cv::Mat& target) {
+
+    std::vector<cv::RotatedRect> extractedRects;
+    for (const auto& bbox : parkingBBoxes) {
+        extractedRects.push_back(bbox.getRotatedRect());
+    }
+    cv::Mat rectsMask = ImageProcessing::createRectsMask(extractedRects, target.size());
+    return rectsMask;
+}
+
+cv::Mat Segmentation::getColorMask(const cv::Mat &car_fgMask, const cv::Mat & parking_mask) {
+
+    const cv::Scalar PARKED_CAR = cv::Scalar(0,0,255);
+    const cv::Scalar ROAMING_CAR = cv::Scalar(0,255,0);
+
+    cv::Mat labels, stats, centroids;
+    int num_labels = cv::connectedComponentsWithStats(car_fgMask, labels,stats, centroids);
+
+    cv::Mat out_mask = cv::Mat::zeros(car_fgMask.size(), CV_8UC3);
+
+    for(int label = 1; label < num_labels; label++){
+        cv::Mat current_object = (labels == label);
+
+        cv::Mat intersect;
+        cv::bitwise_and(current_object, parking_mask, intersect);
+
+        if(cv::countNonZero(intersect)>0){
+            out_mask.setTo(PARKED_CAR, current_object);
+        } else{
+            out_mask.setTo(ROAMING_CAR, current_object);
+        }
+    }
+    return out_mask;
+}
+
+cv::Mat Segmentation::seeSegmentationResult() {
+    return final_image;
+}
+
+cv::Mat Segmentation::getSegmentationMask() {
+    return final_mask;
+}
+
+Segmentation::Segmentation(const std::filesystem::path &emptyFramesDir, const std::filesystem::path &mogTrainingDir,const std::vector<BoundingBox>& parkingBBoxes,const std::string& imageName) {
         cv::Mat parking_with_cars_col = cv::imread(imageName);
         cv::Mat parking_with_cars;
         cv::cvtColor(parking_with_cars_col, parking_with_cars, cv::COLOR_BGR2GRAY);
@@ -120,44 +162,29 @@ Segmentation::Segmentation(const std::filesystem::path &emptyFramesDir, const st
         cv::Mat empty_parking = averageEmptyImages(emptyFramesDir);
         cv::Mat parking_masked;
         std::vector<cv::String> backgroundImages;
-        cv::glob("/home/trigger/Documents/GitHub/Parking_lot_occupancy/testingEnv/ParkingLot_dataset/sequence0/frames", backgroundImages);
+        cv::glob(mogTrainingDir, backgroundImages);
         cv::Ptr<cv::BackgroundSubtractorMOG2> mog2 = trainBackgroundModel(backgroundImages);
         cv::Mat bgSubctMask = cv::Mat::zeros(parking_with_cars.size(), CV_8UC1);
+        cv::Mat parkingSpaceMask = cv::Mat::zeros(parking_with_cars.size(), CV_8UC1);
+        parkingSpaceMask = getBBoxMask(parkingBBoxes, parkingSpaceMask);
+
+
         cv::Mat Mog2Mask = getForegroundMaskMOG2(mog2, parking_with_cars_col);
         mask = backgroundSubtractionMask(empty_parking, parking_with_cars);
-        cv::imshow("bgelim", mask);
         cv::bitwise_and(mask, Mog2Mask, bgSubctMask);
 
-        cv::imshow("bwand", bgSubctMask);
-        parking_with_cars.copyTo(parking_masked, mask);
+
 
         cv::morphologyEx(bgSubctMask, bgSubctMask, cv::MORPH_DILATE, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(8, 16)));
         cv::morphologyEx(bgSubctMask, bgSubctMask, cv::MORPH_ERODE, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5)));
         bgSubctMask = smallContoursElimination(bgSubctMask, 1500);
-        cv::imshow("fgMaskMOG2", bgSubctMask);
 
-        cv::Mat fgMask = cv::Mat::zeros(bgSubctMask.size(), CV_8UC3);
-        for (int x = 0; x < bgSubctMask.rows; x++) {  // Iterate over rows (height)
-            for (int y = 0; y < bgSubctMask.cols; y++) {  // Iterate over columns (width)
-                if ((int) bgSubctMask.at<uchar>(cv::Point(y, x)) == 255) {
-                    fgMask.at<cv::Vec3b>(cv::Point(y, x))[0] = 0;
-                    fgMask.at<cv::Vec3b>(cv::Point(y, x))[1] = 255;
-                    fgMask.at<cv::Vec3b>(cv::Point(y, x))[2] = 0;
-                } else {
-                    fgMask.at<cv::Vec3b>(cv::Point(y, x))[0] = 0;
-                    fgMask.at<cv::Vec3b>(cv::Point(y, x))[1] = 0;
-                    fgMask.at<cv::Vec3b>(cv::Point(y, x))[2] = 0;
-                }
-            }
-        }
-
-        addWeighted(fgMask, 1, src_clean, 0.5, 0, src_clean);
-
-        cv::imshow("segmentation", src_clean);
-
-        cv::waitKey(0);
+        final_mask = getColorMask(bgSubctMask, parkingSpaceMask);
+        final_image = Graphics::maskApplication(src_clean, final_mask);
 
 }
+
+
 
 
 

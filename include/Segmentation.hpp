@@ -6,6 +6,8 @@
 #define MAIN_SEGMENTATION_HPP
 
 #include "../include/ImageProcessing.hpp"
+#include "../include/BoundingBox.hpp"
+#include "../include/Graphics.hpp"
 
 #include "filesystem"
 #include "vector"
@@ -20,11 +22,15 @@
 
 class Segmentation {
 public:
-    Segmentation(const std::filesystem::path& emptyFramesDir, const std::string& imageName);
+    Segmentation(const std::filesystem::path& emptyFramesDir, const std::filesystem::path& mogTrainigDir,const std::vector<BoundingBox>& parkingBBoxes ,const std::string& imageName);
 
+    cv::Mat seeSegmentationResult ();
 
+    cv::Mat getSegmentationMask ();
 
 private:
+    cv::Mat final_mask;
+    cv::Mat final_image;
 
     cv::Ptr<cv::BackgroundSubtractorMOG2> trainBackgroundModel(const std::vector<cv::String>& backgroundImages);
 
@@ -34,13 +40,11 @@ private:
 
     cv::Mat backgroundSubtractionMask(const cv::Mat& empty_parking, const cv::Mat& busy_parking);
 
-    cv::Mat siftMaskEnhancement(const cv::Mat& starting_mask, const cv::Mat& empty_parking, const cv::Mat& masked_busy_parking);
-
     cv::Mat smallContoursElimination(const cv::Mat& input_mask, const int&minArea);
 
-    cv::Mat grabCutMask(const cv::Mat& input_mask, const cv::Mat& input_img);
+    cv::Mat getBBoxMask(const std::vector<BoundingBox>& parkingBBoxes, cv::Mat& target);
 
-
+    cv::Mat getColorMask(const cv::Mat& car_fgMask, const cv::Mat& parking_mask);
 };
 
 

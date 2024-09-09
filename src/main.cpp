@@ -25,15 +25,21 @@ int main(int argc, char** argv) {
         return -1;
     }
 
+    std::filesystem::path currentPath = std::filesystem::current_path();
     // Directories paths
     std::string framePath = static_cast<std::string>(argv[2]) + "/frames";
     std::string groundTruthPath = static_cast<std::string>(argv[2]) + "/bounding_boxes";
     std::string maskPath = static_cast<std::string>(argv[2]) + "/masks";
+    std::string trainingPath = static_cast<std::string>(currentPath) + "/ParkingLot_dataset/mog2_training_sequence";
+
 
     std::filesystem::path pathSequence0FramesDir = std::filesystem::absolute(argv[1]);
     std::filesystem::path pathSequenceFramesDir = std::filesystem::absolute(framePath);
     std::filesystem::path pathGroundTruthDir = std::filesystem::absolute(groundTruthPath);
     std::filesystem::path pathMaskDir = std::filesystem::absolute(maskPath);
+    std::filesystem::path trainingDir = std::filesystem::absolute(trainingPath);
+
+
 
     // Check directories
     if (!checkDirectory(pathSequence0FramesDir, "sequence0") || !checkDirectory(pathSequenceFramesDir, "Frames") ||
@@ -69,14 +75,16 @@ int main(int argc, char** argv) {
 
         // First Metric
         cv::Mat zero = cv::Mat::zeros(10,10, CV_8UC3);
-        Metrics metrics = Metrics(groundTruth.getBBoxes(), parkingStatus.getStatusPredictions(), zero);
+        //Metrics metrics = Metrics(groundTruth.getBBoxes(), parkingStatus.getStatusPredictions(), zero);
 
-        std::cout << "mAP: " << metrics.calculateMeanAveragePrecisionParkingSpaceLocalization() << std::endl;
-        cv::waitKey(0);
+        //std::cout << "mAP: " << metrics.calculateMeanAveragePrecisionParkingSpaceLocalization() << std::endl;
+        //cv::waitKey(0);
         // Segmentation
 
-        //Segmentation seg = Segmentation(pathSequence0FramesDir, imgPath);
+        Segmentation seg = Segmentation(pathSequence0FramesDir, trainingDir ,parkingStatus.getStatusPredictions(),imgPath);
 
+        cv::imshow("Segmentation", seg.seeSegmentationResult());
+        //cv::waitKey(0);
 
         // Second Metric
 

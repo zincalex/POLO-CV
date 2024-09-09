@@ -173,3 +173,9 @@ void Graphics::applyMap(const std::string &imageName, const std::vector<unsigned
     cv::imshow("2DMap", src);
     cv::waitKey(0);
 }
+
+cv::Mat Graphics::maskApplication(cv::Mat &target, const cv::Mat &mask) {
+    cv::Mat masked_image = target.clone();
+    addWeighted(mask, 1, masked_image, 0.5, 0, masked_image);
+    return masked_image;
+}

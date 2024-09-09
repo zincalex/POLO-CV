@@ -4,8 +4,8 @@ void Graphics::getParkingRow(std::vector<cv::RotatedRect> &parkingSlots, int num
                              float horizontalOffsetAdjustment, int yOffset, float verticalOffsetAdjustment,
                              int parkingWidth, int parkingHeight, int spacing, int extraSpacing, bool isDoubleRow,
                              bool isLowerSet) {
-    float radianAngle = angle * CV_PI / 180.0;  // Converts angle in radians
-    float verticalOffset = parkingWidth * std::sin(radianAngle);  // Vertical offset calculated with trigonometry
+    float radianAngle = angle * CV_PI / 180.0;
+    float verticalOffset = parkingWidth * std::sin(radianAngle);
 
     //Work with distinct parking space sets to manage different position, angle and size
     for (int i = 0; i < numParking; ++i) {
@@ -88,7 +88,7 @@ std::vector<cv::RotatedRect> Graphics::getBoxes() {
 
 
 cv::Mat Graphics::drawMap(const std::vector<cv::RotatedRect> &parkingSpaces) {
-    //define dimensions of original map and create a matrix with white background
+    //define dimensions of original map
     int width = 950;
     int height = 750;
 
@@ -130,15 +130,14 @@ void Graphics::fillRotatedRectsWithCar(cv::Mat &image, const std::vector<cv::Rot
 
 
 void Graphics::mapOverlay(cv::Mat &src, const cv::Mat& map) {
-    // Create a local copy of the map to modify without changing the original
     cv::Mat mapLocal = map.clone();
 
-    // Resize map to specified dimension
+    // Resize map for overlay
     cv::resize(mapLocal, mapLocal, cv::Size(270, 225));
 
-    // Position of top left corner
-    int x_pos = 15;
-    int y_pos = 485;
+    // Position of top left corner (read using image manipulation software and fixed)
+    const int x_pos = 15;
+    const int y_pos = 485;
 
     cv::Rect mapROI(x_pos, y_pos, mapLocal.cols, mapLocal.rows);
     mapLocal.copyTo(src(mapROI));
@@ -147,21 +146,19 @@ void Graphics::mapOverlay(cv::Mat &src, const cv::Mat& map) {
 
 
 void Graphics::drawRotatedRects(cv::Mat& image, const std::vector<cv::RotatedRect>& rotatedRects) {
-    // Define the color for the border (Red)
-    cv::Scalar redColor(0, 0, 255);  // BGR format, so (0, 0, 255) is red
+    cv::Scalar redColor(0, 0, 255);
 
     for (const cv::RotatedRect& rect : rotatedRects) {
         // Get the 4 vertices of the rotated rectangle
         cv::Point2f vertices[4];
         rect.points(vertices);
 
-        // Convert the vertices to integer points (required by polylines)
+        // Convert the vertices to integer points
         std::vector<cv::Point> intVertices(4);
         for (int i = 0; i < 4; i++) {
             intVertices[i] = vertices[i];
         }
 
-        // Draw the rectangle with a red border
         cv::polylines(image, intVertices, true, redColor, 2);  // Thickness of 2
     }
 }

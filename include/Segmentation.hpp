@@ -119,7 +119,11 @@ private:
      * @return mat containing a mask with black as background, red as car in parking slot and green as roaming car
      */
     cv::Mat getColorMask(const cv::Mat& car_fgMask, const cv::Mat& parking_mask);
+
+    int dynamicContoursThresh(const cv::Mat& mask_to_filter);
 };
+
+
 
 
 

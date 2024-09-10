@@ -104,7 +104,7 @@ cv::Mat Segmentation::getForegroundMaskMOG2(cv::Ptr<cv::BackgroundSubtractorMOG2
     }
     //draws filled polygons from the mask to fill some gaps in the mask
     //cv::morphologyEx(mog2_final_mask, mog2_final_mask, cv::MORPH_DILATE, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 6)));
-    //cv::imshow("TEST", drawing);
+    cv::imshow("TEST", mog2_final_mask);
     return mog2_final_mask;
 }
 
@@ -163,6 +163,17 @@ cv::Mat Segmentation::getSegmentationMaskBinary() {
     return final_binary_mask;
 }
 
+int Segmentation::dynamicContoursThresh(const cv::Mat &mask_to_filter) {
+    int num_mask_pixels = cv::countNonZero(mask_to_filter);
+    int threshold;
+    if (num_mask_pixels < 45000){
+        threshold = 1000;
+    } else {
+        threshold = 300;
+    }
+    return  threshold;
+}
+
 Segmentation::Segmentation(const std::filesystem::path &emptyFramesDir, const std::filesystem::path &mogTrainingDir,const std::vector<BoundingBox>& parkingBBoxes,const std::string& imageName) {
         //parameter loading and definition of needed support matrices
         cv::Mat parking_with_cars_col = cv::imread(imageName);
@@ -188,11 +199,12 @@ Segmentation::Segmentation(const std::filesystem::path &emptyFramesDir, const st
 
         //final mask refinement
         //morphological to clean the final masks as best as possible
-        //cv::morphologyEx(bgSubctMask, bgSubctMask, cv::MORPH_DILATE, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(8, 7)));
         //cv::morphologyEx(bgSubctMask, bgSubctMask, cv::MORPH_ERODE, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(4, 4)));
 
         //removes the small noise
-        bgSubctMask = smallContoursElimination(bgSubctMask, 1500);
+        int small_contour = dynamicContoursThresh(bgSubctMask);
+        bgSubctMask = smallContoursElimination(bgSubctMask, small_contour);
+        cv::morphologyEx(bgSubctMask, bgSubctMask, cv::MORPH_DILATE, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(8, 7)));
 
         //assign variables for access
         final_binary_mask = bgSubctMask.clone();

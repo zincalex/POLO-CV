@@ -105,8 +105,6 @@ cv::Mat Graphics::drawMap(const std::vector<cv::RotatedRect> &parkingSpaces) {
         for (int i = 0; i < 4; i++) {
             cv::line(parkingMap, vertices[i], vertices[(i + 1) % 4], cv::Scalar(51, 36, 4), 20);
         }
-        //std::string number = std::to_string(i);
-        //cv::putText(parkingMap, number, parkingSpaces[i].center, cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0,0,0), 2);
     }
     return parkingMap;
 }
@@ -119,12 +117,17 @@ void Graphics::fillRotatedRectsWithCar(cv::Mat &empty_map, const std::vector<cv:
     const cv::Scalar PARKING_BUSY = cv::Scalar(130, 96, 21);
     const cv::Scalar BLACK = cv::Scalar(0, 0, 0);
     const cv::Scalar WHITE = cv::Scalar(255, 255, 255);
+    const cv::Scalar NON_CONSIDERED_COLOR = cv::Scalar(127,127,127);
+    const std::string NON_CONSIDERED_TEXT = "N/A";
+    const int PARKING_NUMBER = 37;
 
     for (size_t i = 0; i < rectangles.size(); ++i) {
         std::set<int> greenIndexesSet(carIndices.begin(), carIndices.end());
+        cv::Point label_position = rectangles[i].center;
+        label_position.x -=20;
         // If index is found (car parked in the space) rectangle is filled with red or with blue if empty
         cv::Scalar color = (greenIndexesSet.find(i+1) != greenIndexesSet.end()) ? PARKING_OCCUPIED : PARKING_BUSY;
-        color = (i > 36) ? BLACK : color;
+        color = (i > 36) ? NON_CONSIDERED_COLOR : color;
         cv::Point2f vertices[4];
         rectangles[i].points(vertices);
 
@@ -135,6 +138,14 @@ void Graphics::fillRotatedRectsWithCar(cv::Mat &empty_map, const std::vector<cv:
 
         std::vector<std::vector<cv::Point>> fillPoints = { points };
         cv::fillPoly(empty_map, fillPoints, color);
+        std::string number = std::to_string(i+1);
+
+        if (i < PARKING_NUMBER) {
+            cv::putText(empty_map, number, label_position, cv::FONT_HERSHEY_SIMPLEX, 1.2, BLACK, 4);
+        }else{
+            label_position.x -=15;
+            cv::putText(empty_map, NON_CONSIDERED_TEXT, label_position, cv::FONT_HERSHEY_SIMPLEX, 1, BLACK, 4);
+        }
     }
 
 }
@@ -182,7 +193,6 @@ void Graphics::applyMap(const std::string &imageName, const std::vector<unsigned
     fillRotatedRectsWithCar(mapImage, rectangles, occupiedParkingSpaces);
     mapOverlay(src, mapImage);
     cv::imshow("2DMap", src);
-    cv::waitKey(0);
 }
 
 cv::Mat Graphics::maskApplication(cv::Mat &target, const cv::Mat &mask) {

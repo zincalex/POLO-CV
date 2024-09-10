@@ -829,6 +829,6 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
                     break;
                 }
             }
-        } while (foundIntersecting);
+        } while (foundIntersecting && parkNumber < 38);
     }
 }

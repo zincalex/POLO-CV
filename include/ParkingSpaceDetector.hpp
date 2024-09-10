@@ -6,7 +6,6 @@
 #define PARKINGSPACEDETECTION_HPP
 
 #include <vector>
-#include <iostream>
 #include <filesystem>
 #include <limits>
 #include <opencv2/imgproc.hpp>

@@ -85,9 +85,8 @@ int main(int argc, char** argv) {
 
 
         // Segmentation
-        //Segmentation seg = Segmentation(pathSequence0FramesDir, trainingDir ,parkingStatus.getStatusPredictions(),imgPath);
-        //cv::imshow("Segmentation", seg.getSegmentationResult());
-        //cv::imshow("groundTruth", segmentationGTMask);
+        Segmentation seg = Segmentation(pathSequence0FramesDir, trainingDir ,parkingStatus.getStatusPredictions(),imgPath);
+        cv::imshow("Segmentation", seg.getSegmentationResult());
 
 
         // Metrics

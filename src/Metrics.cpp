@@ -1,13 +1,122 @@
 #include "../include/Metrics.hpp"
 
-double calculateIoUObjectDetection(const cv::RotatedRect& rect1, const cv::RotatedRect& rect2) {
+double Metrics::calculateMeanAveragePrecisionParkingSpaceLocalization() const {
+    const double IOU_THRESHOLD = 0.5;
+
+    std::vector<int> totalGroundTruths = {0,0};             // total number of empty and full parking space
+    std::vector<std::vector<double>> precisions(2);      // cumulative precision values per class
+    std::vector<std::vector<double>> recalls(2);         // cumulative recall values per class
+
+    // AP calculated using the 11 point interpolation method
+    std::vector<double> recall_levels = {0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0};
+
+    std::vector<double> averagePrecisions(2, 0);
+
+    // Divide the predictions in the 2 classes -----> 0 no car, 1  car
+    std::vector<std::vector<BoundingBox>> sortedPredictionBoxes(2);
+    for (const BoundingBox& bBox : bBoxesPrediction)
+        bBox.isOccupied() ? sortedPredictionBoxes[1].push_back(bBox) : sortedPredictionBoxes[0].push_back(bBox);
+
+    // Count the actual number of cars
+    for (const BoundingBox& trueB : groundTruth)
+        if (trueB.getNumber() <= 37) // get only the values of the main two parking spaces (avoiding the upper part)
+            trueB.isOccupied() ? totalGroundTruths[1] += 1 : totalGroundTruths[0] += 1;
+
+    // Check the number of classes (in some sequence images, there are no car. Hence, it might happen that no cars are detected)
+    std::vector<unsigned int> classes; // vector of indices
+    for (unsigned int i = 0; i < 2; ++i) {
+        if (totalGroundTruths[i] != 0)
+            classes.push_back(i);
+    }
+
+    // Calculate the cumulative precisions and recalls for each class
+    for (unsigned int& i : classes) {
+
+        unsigned int truePositives = 0;
+        unsigned int falsePositives = 0;
+        for (const BoundingBox &predictBBox: sortedPredictionBoxes[i]) {
+            double bestIOU = -1;
+            short bestMatchIndex = -1;
+
+            // In order to determine which parking space is being predicted, we compare each prediction with all the ground truth boxes
+            // and keep the greater IoU
+            for (unsigned int j = 0; j < groundTruth.size(); ++j) {
+                double iou = calculateIoUObjectDetection(predictBBox.getRotatedRect(), groundTruth[j].getRotatedRect());
+                if (iou > bestIOU) {
+                    bestIOU = iou;
+                    bestMatchIndex = static_cast<short>(j);
+                }
+            }
+
+            // Only if the IoU is above the 0.5 threshold and the prediction is correct, we count is as a true positive
+            (bestIOU >= IOU_THRESHOLD && predictBBox.isOccupied() == groundTruth[bestMatchIndex].isOccupied()) ? truePositives++ : falsePositives++;
+
+            // Add the cumulative values
+            precisions[i].push_back(static_cast<double>(truePositives) / (truePositives + falsePositives));
+            recalls[i].push_back(static_cast<double>(truePositives) / totalGroundTruths[i]);
+        }
+    }
+
+
+    // Compute the AP for each class
+    for (unsigned int& i : classes) {
+        double ap = 0.0;
+
+        for (double recall_level : recall_levels) { // Iterate through each recall level
+            double max_precision = 0.0;
+
+            for (unsigned int k = 0; k < recalls[i].size(); ++k) { // for each cumulative value stored
+                if (recalls[i][k] >= recall_level)
+                    max_precision = std::max(max_precision, precisions[i][k]);
+            }
+
+            ap += max_precision;  // Add the maximum precision for this recall level
+        }
+        averagePrecisions[i] = ap / 11.0;   // 11 Point Interpolation Method
+    }
+
+
+    // Compute mAP
+    double mean = 0.0;
+    for (unsigned int& i : classes)
+        mean += averagePrecisions[i];
+    mean /= classes.size();
+
+    return mean;
+}
+
+
+double Metrics::calculateMeanIntersectionOverUnionSegmentation() const {
+    unsigned int possibleTotalClasses = 3;
+    double totalIoU = 0;
+    std::vector<double> iouPerClass;
+
+    // Calculate IoU for each class
+    for (unsigned int classId = 0; classId < possibleTotalClasses; ++classId) {
+        // Since the GT mask and segmentation mask have different values for identifying a class
+        // we pass it to a function in order to make the mask in grayscale and align the convention
+        double iou = calculateIoUSegmentation(ImageProcessing::convertColorMaskToGray(trueSegmentationMask),
+                                              ImageProcessing::convertColorMaskToGray(segmentationColorMask), classId);
+
+        if (iou != -1) { // Class present
+            iouPerClass.push_back(iou);
+            totalIoU += iou;
+        }
+    }
+
+    // Calculate average IoU over all classes
+    return totalIoU / static_cast<double>(iouPerClass.size());
+}
+
+
+double Metrics::calculateIoUObjectDetection(const cv::RotatedRect& rect1, const cv::RotatedRect& rect2) const {
     std::vector<cv::Point2f> vertices1(4);
     rect1.points(vertices1.data());
 
     std::vector<cv::Point2f> vertices2(4);
     rect2.points(vertices2.data());
 
-    // Find the intersection area
+    // Find the intersection of the two rects
     std::vector<cv::Point2f> intersectionPoints;
     int intersectionResult = cv::rotatedRectangleIntersection(rect1, rect2, intersectionPoints);
 
@@ -24,124 +133,19 @@ double calculateIoUObjectDetection(const cv::RotatedRect& rect1, const cv::Rotat
 }
 
 
-double Metrics::calculateMeanAveragePrecisionParkingSpaceLocalization() const {
-
-    const bool DEBUG = false;
-    const double IOU_THRESHOLD = 0.5;
-
-    std::vector<int> totalGroundTruths = {0,0};
-    std::vector<std::vector<double>> recalls(2);
-    std::vector<std::vector<double>> precisions(2);
-    std::vector<double> recall_levels = {0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0};
-
-    std::vector<double> average_precision(2, 0);
-
-    // Divide the classification in the 2 classes -----> 0 no car, 1  car
-    std::vector<std::vector<BoundingBox>> sortedPredictionBoxes(2);
-    std::vector<std::vector<BoundingBox>> sortedGroundTruth(2);
-    for (const BoundingBox& bBox : bBoxesPrediction)
-        bBox.isOccupied() ? sortedPredictionBoxes[1].push_back(bBox) : sortedPredictionBoxes[0].push_back(bBox);
-    for (const BoundingBox& trueB : groundTruth)
-        if (trueB.getNumber() <= 37)
-            trueB.isOccupied() ? totalGroundTruths[1] += 1 : totalGroundTruths[0] += 1;
-
-    // Check the number of classes (in some sequence images, there are no car. Hence, it might happen that no cars are dected)
-    std::vector<unsigned int> classes;
-    for (unsigned int i = 0; i < 2; ++i) {
-        if (totalGroundTruths[i] != 0)
-            classes.push_back(i);
-    }
-
-
-
-    // Calculate the cumulative precisions and recalls for each class
-    for (unsigned int& i : classes) {
-        unsigned int truePositives = 0;
-        unsigned int falsePositives = 0;
-
-        if (DEBUG) std::cout << "Working for cars that are : " << i << std::endl;
-        if (DEBUG) std::cout << "Number of true values here : " << totalGroundTruths[i] << std::endl;
-
-        for (const BoundingBox &predictBBox: sortedPredictionBoxes[i]) {
-            short bestMatch = -1;
-            short bestMatchIndex = -1;
-            double bestIOU = -1;
-            for (unsigned int j = 0; j < groundTruth.size(); ++j) {
-                double iou = calculateIoUObjectDetection(predictBBox.getRotatedRect(), groundTruth[j].getRotatedRect());
-                if (iou > bestIOU) {
-                    bestIOU = iou;
-                    bestMatchIndex = static_cast<short>(j);
-                }
-            }
-            if (DEBUG) std::cout << "Car " << predictBBox.getNumber() << " matched with position " << groundTruth[bestMatchIndex].getNumber()  << " with iou " << bestIOU << std::endl;
-            (bestIOU >= IOU_THRESHOLD && predictBBox.isOccupied() == groundTruth[bestMatchIndex].isOccupied()) ? truePositives++ : falsePositives++;
-            precisions[i].push_back(static_cast<double>(truePositives) / (truePositives + falsePositives));
-            recalls[i].push_back(static_cast<double>(truePositives) / totalGroundTruths[i]);
-        }
-
-        if (DEBUG) std::cout << "Class " << i << " ---->   " << "TP : " << truePositives << ", FP : " << falsePositives << std::endl;
-        if (DEBUG) std::cout << "------------------ " << std::endl;
-    }
-
-    if (DEBUG) {
-        for (unsigned int i = 0; i < precisions.size(); ++i) {
-            std::cout << "Class " << i << " Precisions: ";
-            for (const auto &p: precisions[i]) {
-                std::cout << p << " ";
-            }
-            std::cout << std::endl;
-        }
-        for (unsigned int i = 0; i < recalls.size(); ++i) {
-            std::cout << "Class " << i << " Recalls: ";
-            for (const auto& r : recalls[i]) {
-                std::cout << r << " ";
-            }
-            std::cout << std::endl;
-        }
-    }
-
-
-    // For each class
-    for (unsigned int& i : classes) {
-        double ap = 0.0;
-
-        // Iterate through each recall level
-        for (double recall_level : recall_levels) {
-            double max_precision = 0.0;
-
-            for (unsigned int k = 0; k < recalls[i].size(); ++k)
-                if (recalls[i][k] >= recall_level)
-                    max_precision = std::max(max_precision, precisions[i][k]);
-
-            if (DEBUG) std::cout << "Max precision " << max_precision << " for recall level " << recall_level << std::endl;
-
-            ap += max_precision;  // Add the maximum precision for this recall level
-        }
-        average_precision[i] = ap / 11.0;   // 11 Point Interpolation Method
-
-        if (DEBUG) std::cout << "avgP: " << average_precision[i] << std::endl;
-    }
-
-
-    // Compute mAP
-    double mean = 0.0;   // Initialize mean average precision
-    for (unsigned int& i : classes)
-        mean += average_precision[i];
-    mean /= classes.size();
-
-    return mean;
-}
-
-
-
-double calculateIoUSegmentation(const cv::Mat& groundTruthMask, const cv::Mat& predictedMask, const unsigned int& classId) {
+double Metrics::calculateIoUSegmentation(const cv::Mat& groundTruthMask, const cv::Mat& predictedMask, const unsigned int& classId) const {
+    // classId :
+    //   - 0 -> background
+    //   - 1 -> car inside parking space
+    //   - 2 -> car outside parking space
     cv::Mat groundTruthClass = (groundTruthMask == classId); // 255 where there is a match
     cv::Mat predictedClass = (predictedMask == classId);
 
     // Calculate intersection and union
-    cv::Mat intersectionMask = (groundTruthClass & predictedClass);
-    cv::Mat unionMask = (groundTruthClass | predictedClass);
+    cv::Mat intersectionMask = groundTruthClass & predictedClass;
+    cv::Mat unionMask = groundTruthClass | predictedClass;
 
+    // Calculate the number of pixels for each mask
     unsigned long intersectionCount = cv::countNonZero(intersectionMask);
     unsigned long unionCount = cv::countNonZero(unionMask);
 
@@ -152,29 +156,6 @@ double calculateIoUSegmentation(const cv::Mat& groundTruthMask, const cv::Mat& p
     // In the case where the G.T has a value while the prediction has not (intersection is zero), and viceversa, the return value is 0
     return static_cast<double>(intersectionCount) / static_cast<double>(unionCount);
 }
-
-
-double Metrics::calculateMeanIntersectionOverUnionSegmentation() const {
-
-    int possibleTotalClasses = 3;
-    double totalIoU = 0;
-    std::vector<double> iouPerClass;
-
-    // Calculate IoU for each class
-    for (unsigned int classId = 0; classId < possibleTotalClasses; ++classId) {
-        double iou = calculateIoUSegmentation(ImageProcessing::convertColorMaskToGray(trueSegmentationMask),
-                                              ImageProcessing::convertColorMaskToGray(segmentationColorMask), classId);
-
-        if (iou != -1) {
-            iouPerClass.push_back(iou);
-            totalIoU += iou;
-        }
-    }
-
-    // Calculate average IoU over all classes
-    return totalIoU / static_cast<double>(iouPerClass.size());
-}
-
 
 
 Metrics::Metrics(const std::vector<BoundingBox>& groundTruth, const std::vector<BoundingBox>& bBoxesPrediction,

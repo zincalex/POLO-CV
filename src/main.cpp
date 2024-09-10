@@ -87,7 +87,7 @@ int main(int argc, char** argv) {
 
         // Metrics
         Metrics metrics = Metrics(groundTruth.getBBoxes(), parkingStatus.getStatusPredictions(), segmentationGTMask, seg.getSegmentationMaskWithClasses());
-        //std::cout << "mAP: " << metrics.calculateMeanAveragePrecisionParkingSpaceLocalization() << std::endl;
+        std::cout << "mAP: " << metrics.calculateMeanAveragePrecisionParkingSpaceLocalization() << std::endl;
         std::cout << "mIoU: " << metrics.calculateMeanIntersectionOverUnionSegmentation() << std::endl;
         cv::waitKey(0);
 

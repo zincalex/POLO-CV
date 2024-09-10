@@ -1,18 +1,16 @@
 #ifndef PARKINGSPACEDETECTION_HPP
 #define PARKINGSPACEDETECTION_HPP
 
-#include "BoundingBox.hpp"
-#include "ImageProcessing.hpp"
-#include "Graphics.hpp"
-
 #include <vector>
 #include <iostream>
 #include <filesystem>
 #include <limits>
-
 #include <opencv2/imgproc.hpp>
 #include <opencv4/opencv2/highgui.hpp>
 
+#include "BoundingBox.hpp"
+#include "ImageProcessing.hpp"
+#include "Graphics.hpp"
 
 class ParkingSpaceDetector {
 public:

@@ -1,9 +1,9 @@
 #ifndef IMAGEPROCESSING_HPP
 #define IMAGEPROCESSING_HPP
 
-#include "BoundingBox.hpp"
-
 #include <opencv2/imgproc.hpp>
+
+#include "BoundingBox.hpp"
 
 class ImageProcessing {
 public:

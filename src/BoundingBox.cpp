@@ -1,19 +1,11 @@
 #include "../include/BoundingBox.hpp"
 
-BoundingBox::BoundingBox(const cv::RotatedRect& rect, const unsigned short& number, const bool& occupied) {
-    this->center = rect.center;
-    this->rect = rect;
-    this->number = number;
-    this->occupied = occupied;
+void BoundingBox::updateState() {
+    // occupied = 0 ---> parking space empty
+    // occupied = 1 ---> parking space full
+    occupied ? occupied = false : occupied = true;
 }
 
-void BoundingBox::updateState() {
-    if (!occupied) {
-        occupied = true;
-    } else {
-        occupied = false;
-    }
-}
 
 cv::Point BoundingBox::getTlCorner() const {
     cv::Point2f vertices[4];
@@ -34,4 +26,9 @@ cv::Point BoundingBox::getTlCorner() const {
 }
 
 
-
+BoundingBox::BoundingBox(const cv::RotatedRect& rect, const unsigned short& number, const bool& occupied) {
+    this->center = rect.center;
+    this->rect = rect;
+    this->number = number;
+    this->occupied = occupied;
+}

@@ -1,3 +1,7 @@
+/**
+ * @author Alessandro Viespoli 2120824
+ */
+
 #include "../include/ImageProcessing.hpp"
 
 cv::Mat ImageProcessing::optionalAreaROI(const cv::Size& imgSize) {
@@ -86,30 +90,6 @@ cv::Mat ImageProcessing::saturation_thresholding(const cv::Mat& input, const uns
 }
 
 
-cv::Mat ImageProcessing::minFilter(const cv::Mat& input, const int& kernel_size) {
-    cv::Mat out(input.size(), CV_8U);
-    for(int i = 0; i < input.rows; i++) {
-        for(int j = 0; j < input.cols; j++) {
-            int min = 255;
-            int temp;
-            for(int x = -kernel_size/2; x <= kernel_size/2; x++) {
-                for(int y = -kernel_size/2; y <= kernel_size/2; y++) {
-                    if((i+x) >= 0 && (j+y) >= 0 && (i+x) < input.rows && (j + y) < input.cols) { // in case the kernel exceeds the image size
-                        temp = input.at<unsigned char> (i + x, j + y);
-                        if(temp < min)
-                            min = temp;
-                    }
-                }
-            }
-
-            for(int x = -kernel_size/2; x <= kernel_size/2; x++)
-                for(int y = -kernel_size/2; y <= kernel_size/2; y++)
-                    if((i+x) >= 0 && (j+y) >= 0 && (i+x) < input.rows && (j + y) < input.cols)
-                        out.at<unsigned char> (i+x, j+y) = min;
-        }
-    }
-    return out;
-}
 
 cv::Mat ImageProcessing::convertColorMaskToGray(const cv::Mat& segmentationColorMask) {
     cv::Mat classMask = cv::Mat::zeros(segmentationColorMask.size(), CV_8UC1);
@@ -128,65 +108,6 @@ cv::Mat ImageProcessing::convertColorMaskToGray(const cv::Mat& segmentationColor
     }
 
     return classMask;
-}
-
-
-cv::Mat ImageProcessing::adjustContrast(const cv::Mat& inputImg, const double& contrastFactor, const int& brightnessOffset) {
-    cv::Mat newImage = cv::Mat::zeros(inputImg.size(), inputImg.type());
-
-    // Contrast and lighting regulation
-    inputImg.convertTo(newImage, -1, contrastFactor, brightnessOffset);
-    return newImage;
-}
-
-
-cv::Mat ImageProcessing::morphologicalSkeleton(const cv::Mat& binaryImg) {
-    cv::Mat skeleton = cv::Mat::zeros(binaryImg.size(), CV_8UC1);
-
-    cv::Mat element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(3, 3));
-    cv::Mat img = binaryImg.clone();
-
-    cv::Mat temp, eroded;
-    while (true) {
-        cv::erode(img, eroded, element);
-        cv::dilate(eroded, temp, element);
-        cv::subtract(img, temp, temp);
-        cv::bitwise_or(skeleton, temp, skeleton);
-
-        img = eroded.clone();
-
-        // If nothing left to erode, stop the cycle
-        if (cv::countNonZero(img) == 0)
-            break;
-    }
-
-    return skeleton;
-}
-
-
-cv::Mat ImageProcessing::applyCLAHE(const cv::Mat& input){
-    cv::Mat CLAHEimage;
-    cv::cvtColor(input, CLAHEimage, cv::COLOR_BGR2Lab);
-    std::vector<cv::Mat> lab_planes(3);
-    cv::split(CLAHEimage, lab_planes);
-
-    // Apply CLAHE to the L (lightness) channel
-    cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE();
-    clahe->setClipLimit(2.0); // Set clip limit
-    clahe->setTilesGridSize(cv::Size(8, 8)); // Set tile grid size
-
-    cv::Mat clahe_l;
-    clahe->apply(lab_planes[0], clahe_l); // Apply CLAHE to the L channel
-
-    // Merge the modified L channel back with the original A and B channels
-    lab_planes[0] = clahe_l;
-    cv::Mat lab_clahe_image;
-    cv::merge(lab_planes, lab_clahe_image);
-
-    // Convert the LAB image back to BGR color space
-    cv::Mat clahe_bgr_image;
-    cv::cvtColor(lab_clahe_image, clahe_bgr_image, cv::COLOR_Lab2BGR);
-    return clahe_bgr_image;
 }
 
 

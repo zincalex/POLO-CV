@@ -1,3 +1,7 @@
+/**
+ * @author Alessandro Viespoli 2120824
+ */
+
 #ifndef XMLREADER_HPP
 #define XMLREADER_HPP
 

@@ -1,3 +1,7 @@
+/**
+ * @author Francesco Colla 2122543
+ */
+
 #ifndef GRAPHICS_HPP
 #define GRAPHICS_HPP
 

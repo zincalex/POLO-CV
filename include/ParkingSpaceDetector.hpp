@@ -1,3 +1,7 @@
+/**
+ * @author Alessandro Viespoli 2120824
+ */
+
 #ifndef PARKINGSPACEDETECTION_HPP
 #define PARKINGSPACEDETECTION_HPP
 

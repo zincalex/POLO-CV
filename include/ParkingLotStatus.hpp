@@ -1,3 +1,7 @@
+/**
+ * @author Alessandro Viespoli 2120824
+ */
+
 #ifndef PARKINGLOTSTATUS_HPP
 #define PARKINGLOTSTATUS_HPP
 

@@ -1,3 +1,7 @@
+/**
+ * @author Alessandro Viespoli 2120824
+ */
+
 #include <iostream>
 #include <filesystem>
 #include <opencv4/opencv2/imgcodecs.hpp>
@@ -77,22 +81,20 @@ int main(int argc, char** argv) {
         cv::Mat parkingImg = cv::imread(imgPath);
         ParkingLotStatus parkingStatus = ParkingLotStatus(parkingImg, bBoxes);
         cv::imshow("Predicted parking lot status", parkingStatus.seeParkingLotStatus());
+        cv::waitKey(0);
 
 
         // Segmentation
-        Segmentation seg = Segmentation(pathSequence0FramesDir, trainingDir ,parkingStatus.getStatusPredictions(),imgPath);
-        cv::imshow("Segmentation", seg.getSegmentationResult());
+        //Segmentation seg = Segmentation(pathSequence0FramesDir, trainingDir ,parkingStatus.getStatusPredictions(),imgPath);
+        //cv::imshow("Segmentation", seg.getSegmentationResult());
         //cv::imshow("groundTruth", segmentationGTMask);
 
 
         // Metrics
-        Metrics metrics = Metrics(groundTruth.getBBoxes(), parkingStatus.getStatusPredictions(), segmentationGTMask, seg.getSegmentationMaskWithClasses());
-        std::cout << "mAP: " << metrics.calculateMeanAveragePrecisionParkingSpaceLocalization() << std::endl;
-        std::cout << "mIoU: " << metrics.calculateMeanIntersectionOverUnionSegmentation() << std::endl;
-        cv::waitKey(0);
-
-
-
+        //Metrics metrics = Metrics(groundTruth.getBBoxes(), parkingStatus.getStatusPredictions(), segmentationGTMask, seg.getSegmentationMaskWithClasses());
+        //std::cout << "mAP: " << metrics.calculateMeanAveragePrecisionParkingSpaceLocalization() << std::endl;
+        //std::cout << "mIoU: " << metrics.calculateMeanIntersectionOverUnionSegmentation() << std::endl;
+        //cv::waitKey(0);
 
         // 2D Map
         //Graphics::applyMap(imgPath, parkingStatus.getOccupiedParkingSpaces());

@@ -1,3 +1,7 @@
+/**
+ * @author Alessandro Viespoli 2120824
+ */
+
 #include "../include/ParkingSpaceDetector.hpp"
 
 double ParkingSpaceDetector::calculateLineLength(const cv::Vec4i& line) const {
@@ -700,7 +704,7 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
     const std::vector<double> PROXIMITY_THRESHOLDS = {25.0, 15.0};    // proximity distance to consider 2 lines close, (angle dependant)
     const double MIN_LINE_LENGTH = 20;
     const double ANGLE_THRESHOLD = 20.0;                              // difference to consider 2 angles similar
-    const double WHITENESS_THRESHOLD = 0.4;                           // used for eliminate some lines
+    const double WHITENESS_THRESHOLD = 0.1;                           // used for eliminate some lines
 
     // Matching lines parameters
     const double START_END_DISTANCE_THRESHOLD = 85.0;                 // max distance between the start of the first line and the end of the second line
@@ -786,8 +790,8 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
 
     // Adjust perspective
     adjustPerspective(finalBoundingBoxes, imgSize, PARKING_SPACE_ANGLES, MARGIN, MIN_LENGTH_INCREMENT, MAX_LENGTH_INCREMENT);
-    
-    // TODO aggiornare numerazione che cerchi il box adiacente più vicino, se entro tot ok, altrimenti passa al più basso
+
+
     // Build the bounding boxes
     unsigned short parkNumber = 1;
     while (!finalBoundingBoxes.empty() && parkNumber < 38) { // at max there are 37 parking spaces, duplicates are already handled in removeOutliers
@@ -813,7 +817,7 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
                 BoundingBox currentBBox(*it, 0);
 
                 // Check if the top-left of the current bounding box intersects with the last bounding box looked (or in case if top-left corner is close to the center)
-                if (isTopLeftInside(bbox, currentBBox) || isWithinRadius(bbox.getTlCorner(), currentBBox.getCenter(), RADIUS+5)) {
+                if (isTopLeftInside(bbox, currentBBox) || isWithinRadius(bbox.getTlCorner(), currentBBox.getCenter(), RADIUS+10)) {
                     BoundingBox newBbox(*it, parkNumber++);
                     bBoxes.push_back(newBbox);
                     finalBoundingBoxes.erase(it);

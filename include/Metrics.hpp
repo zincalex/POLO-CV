@@ -1,3 +1,7 @@
+/**
+ * @author Alessandro Viespoli 2120824
+ */
+
 #ifndef METRICS_HPP
 #define METRICS_HPP
 

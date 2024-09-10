@@ -1,3 +1,7 @@
+/**
+ * @author Alessandro Viespoli 2120824
+ */
+
 #include "../include/BoundingBox.hpp"
 
 void BoundingBox::updateState() {

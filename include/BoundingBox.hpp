@@ -1,3 +1,7 @@
+/**
+ * @author Alessandro Viespoli 2120824
+ */
+
 #ifndef BOUNDINGBOX_HPP
 #define BOUNDINGBOX_HPP
 

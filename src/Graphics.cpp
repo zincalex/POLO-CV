@@ -1,3 +1,7 @@
+/**
+ * @author Francesco Colla 2122543
+ */
+
 #include "../include/Graphics.hpp"
 
 void Graphics::getParkingRow(std::vector<cv::RotatedRect> &parkingSlots, int numParking, float angle, int xOffset,

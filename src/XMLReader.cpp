@@ -1,3 +1,7 @@
+/**
+ * @author Kabir Bertan 2122545
+ */
+
 #include "../include/XMLReader.hpp"
 
 // Function to extract attributes of each BB from xml file

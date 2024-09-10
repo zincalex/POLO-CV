@@ -36,6 +36,7 @@ bool ParkingSpaceDetector::isWithinRadius(const cv::Point& center, const cv::Poi
 bool ParkingSpaceDetector::isTopLeftInside(const BoundingBox& bbox1, const BoundingBox& bbox2) const {
     cv::Point topLeft = bbox1.getTlCorner();
     cv::RotatedRect bbox2Rect = bbox2.getRotatedRect();
+
     cv::Point2f bbox2Vertices[4];
     bbox2Rect.points(bbox2Vertices);
     std::vector<cv::Point2f> bbox2VerticesVec(bbox2Vertices, bbox2Vertices + 4);
@@ -65,8 +66,10 @@ cv::Point2f ParkingSpaceDetector::getBottomRight(const cv::RotatedRect& rect) co
 
 
 cv::Vec4i ParkingSpaceDetector::standardizeLine(const cv::Vec4i& line) const {
+    // Given start-end notation for the line
     int x1 = line[0], y1 = line[1], x2 = line[2], y2 = line[3];
 
+    // Adjustment
     if (x2 < x1){
         return cv::Vec4i(x2, y2, x1, y1);
     } else if (x2 == x1){
@@ -83,11 +86,11 @@ std::vector<cv::Vec4i> ParkingSpaceDetector::filterLines(std::vector<cv::Vec4i>&
                                                          const std::vector<double>& proximityThresholds, const double& minLength,
                                                          const double& angleThreshold, const double& whitenessThreshold) const {
 
-    const std::pair<double, double> FIRST_ANGLE_RANGE = parkingSpaceLinesAngles[0];
-    const std::pair<double, double> SECOND_ANGLE_RANGE = parkingSpaceLinesAngles[1];
+    const std::pair<double, double> FIRST_ANGLE_RANGE = parkingSpaceLinesAngles[0];  // lines with positive angle
+    const std::pair<double, double> SECOND_ANGLE_RANGE = parkingSpaceLinesAngles[1]; // lines with negative angle
 
     std::vector<cv::Vec4i> filteredLines;
-    std::vector<bool> keepLine(lines.size(), true);
+    std::vector<bool> keepLine(lines.size(), true); // vector to keep track of which lines are to keep
 
     // Sort the lines by increasing value of x coordinates
     std::sort(lines.begin(), lines.end(), [](const cv::Vec4i& a, const cv::Vec4i& b) {
@@ -106,7 +109,7 @@ std::vector<cv::Vec4i> ParkingSpaceDetector::filterLines(std::vector<cv::Vec4i>&
         // 1 CONTROL : eliminate short lines
         if (length1 < minLength) {
             keepLine[i] = false;
-            continue;
+            continue; // if the control is passed move to the next line
         }
 
 
@@ -123,26 +126,25 @@ std::vector<cv::Vec4i> ParkingSpaceDetector::filterLines(std::vector<cv::Vec4i>&
         cv::RotatedRect rotatedRect(center, rectSize, angle1);
         cv::Rect boundingRect = rotatedRect.boundingRect();
 
-        // Ensure the bounding rect is within the image boundaries
-        boundingRect &= cv::Rect(0, 0, referenceImage.cols, referenceImage.rows);
-        // Extract the region of interest (ROI) and create a mask for the rotated rectangle
-        cv::Mat roi = referenceImage(boundingRect);
+        boundingRect &= cv::Rect(0, 0, referenceImage.cols, referenceImage.rows);  // Ensure the bounding rect is within the image boundaries
+        cv::Mat roi = referenceImage(boundingRect);  // Extract the region of interest (ROI) and create a mask for the rotated rectangle
         cv::Mat mask = cv::Mat::zeros(roi.size(), CV_8UC1);
 
         std::vector<cv::Point> points;
         cv::Point2f rectPoints[4];
         rotatedRect.points(rectPoints);
+        // Build the vector of points, necessary for the function cv::fillConvexPoly
         for (unsigned int z = 0; z < 4; z++)
             points.push_back(cv::Point(rectPoints[z].x - boundingRect.x, rectPoints[z].y - boundingRect.y));
-
         cv::fillConvexPoly(mask, points, cv::Scalar(255));
+
         // Calculate the mean color within the masked area
         cv::Scalar meanColor = cv::mean(roi, mask);
         // Calculate the percentage of whiteness
         double whiteness = (meanColor[0] + meanColor[1] + meanColor[2]) / (3.0 * 255.0);
         if (whiteness < 0.4) {
             keepLine[i] = false;
-            continue;
+            continue; // if the control is passed move to the next line
         }
 
 
@@ -158,7 +160,7 @@ std::vector<cv::Vec4i> ParkingSpaceDetector::filterLines(std::vector<cv::Vec4i>&
                 break;
             }
         }
-        if (flag)
+        if (flag) // if the control is passed move to the next line
             continue;
 
 
@@ -209,6 +211,7 @@ std::vector<cv::Vec4i> ParkingSpaceDetector::filterLines(std::vector<cv::Vec4i>&
         }
     }
 
+    // See which line passed all the controls
     for (unsigned int i = 0; i < lines.size(); ++i) {
         if (keepLine[i])
             filteredLines.push_back(lines[i]);
@@ -218,21 +221,21 @@ std::vector<cv::Vec4i> ParkingSpaceDetector::filterLines(std::vector<cv::Vec4i>&
 }
 
 
-std::vector<std::pair<cv::Vec4i, cv::Vec4i>> ParkingSpaceDetector::matchLines(const std::vector<cv::Vec4i>& linesSupreme, const std::vector<std::pair<double, double>>& parkingSpaceLinesAngles,
+std::vector<std::pair<cv::Vec4i, cv::Vec4i>> ParkingSpaceDetector::matchLines(const std::vector<cv::Vec4i>& finalLines, const std::vector<std::pair<double, double>>& parkingSpaceLinesAngles,
                                                                               const double& startEndDistanceThreshold, const double& endStartDistanceThreshold, const double& angleThreshold,
                                                                               const double& deltaXThreshold, const double& deltaYThreshold) const {
 
-    std::vector<cv::Vec4i> lines = linesSupreme;
+    const std::pair<double, double> FIRST_ANGLE_RANGE = parkingSpaceLinesAngles[0];  // lines with positive angle
+    const std::pair<double, double> SECOND_ANGLE_RANGE = parkingSpaceLinesAngles[1]; // lines with negative angle
+
     // Sort the lines with decreasing y values
+    std::vector<cv::Vec4i> lines = finalLines;
     std::sort(lines.begin(), lines.end(), [](const cv::Vec4i& a, const cv::Vec4i& b) {
         return a[1] > b[1];
     });
 
-    const std::pair<double, double> FIRST_ANGLE_RANGE = parkingSpaceLinesAngles[0];
-    const std::pair<double, double> SECOND_ANGLE_RANGE = parkingSpaceLinesAngles[1];
-    std::vector<std::pair<cv::Vec4i, cv::Vec4i>> matchedLines;
 
-    /*cv::Mat image = imageSi.clone();*/
+    std::vector<std::pair<cv::Vec4i, cv::Vec4i>> matchedLines;
     for (unsigned int i = 0; i < lines.size(); ++i) {
         double angle1 = calculateLineAngle(lines[i]);
         cv::Point2f start1(lines[i][0], lines[i][1]);
@@ -241,39 +244,33 @@ std::vector<std::pair<cv::Vec4i, cv::Vec4i>> ParkingSpaceDetector::matchLines(co
         cv::Vec4i bestCandidate;
         bool foundCandidate = false;
         double minDist = std::numeric_limits<double>::max();
-
-        // In order to visualize the line matched, modify the method and pass an image
-        /*cv::line(image, cv::Point2f(start1.x, start1.y), cv::Point2f(end1.x, end1.y), cv::Scalar(0, 0, 255), 2, cv::LINE_AA);*/
-
         for (unsigned int j = i + 1; j < lines.size(); ++j) {
             double angle2 = calculateLineAngle(lines[j]);
 
             if (areAnglesSimilar(angle1, angle2, angleThreshold)) {
                 cv::Point2f start2(lines[j][0], lines[j][1]);
                 cv::Point2f end2(lines[j][2], lines[j][3]);
+
+                // Calculate the distance between the start of the first line and the end of the second, and viceversa
                 double startEndDist = calculatePointsDistance(start1, end2);
                 double endStartDist = calculatePointsDistance(end1, start2);
                 double absDeltaY = std::abs(start1.y - end2.y);
                 double deltaX = start1.x - start2.x;
 
-                // Control for positive rotated rects
+                // Control for lines with positive angles
                 if (startEndDist <= startEndDistanceThreshold && isInRange(angle1, FIRST_ANGLE_RANGE) && absDeltaY >= deltaYThreshold && startEndDist < minDist) {
                     bestCandidate = lines[j];
                     minDist = startEndDist;
                     foundCandidate = true;
-                    /*cv::line(image, cv::Point2f(start2.x, start2.y), cv::Point2f(end2.x, end2.y), cv::Scalar(255, 0, 0), 2, cv::LINE_AA);*/
-                } // Control for negative rotated rects
+                } // Control for lines with negative angles
                 else if (endStartDist <= endStartDistanceThreshold && isInRange(angle1, SECOND_ANGLE_RANGE) && deltaX >= deltaXThreshold && startEndDist < minDist) {
                     bestCandidate = lines[j];
                     minDist = startEndDist;
                     foundCandidate = true;
-                    /*cv::line(image, cv::Point2f(start2.x, start2.y), cv::Point2f(end2.x, end2.y), cv::Scalar(255, 0, 0), 2, cv::LINE_AA);*/
                 }
             }
         }
-        /*cv::imshow("progress", image);
-        cv::waitKey(0);
-        image = imageSi.clone();*/
+
         if (foundCandidate)
             matchedLines.push_back(std::make_pair(lines[i], bestCandidate));
     }
@@ -283,7 +280,6 @@ std::vector<std::pair<cv::Vec4i, cv::Vec4i>> ParkingSpaceDetector::matchLines(co
 
 
 std::vector<cv::RotatedRect> ParkingSpaceDetector::linesToRotatedRect(const std::vector<std::pair<cv::Vec4i, cv::Vec4i>>& matchedLines) const {
-
     std::vector<cv::RotatedRect> rotatedRectCandidates;
     for (const std::pair<cv::Vec4i, cv::Vec4i>& pair : matchedLines) {
         cv::Vec4i line1 = pair.first;
@@ -399,7 +395,7 @@ void ParkingSpaceDetector::InferRotatedRects(std::vector<cv::RotatedRect>& rotat
     for (unsigned int i = 0; i < filteredDegrees.size(); ++i) {
         cv::Point2f bottomRight = getBottomRight(filteredDegrees[i]);
 
-        if (bottomRight.x > 700 && bottomRight.y > maxY) { // Find the rectangle with the maximum Y value and X > 700 with angle between 0 and 50 degree
+        if (bottomRight.x > 700 && bottomRight.y > maxY) { // Find the rectangle with the maximum Y value and X > 700 with angle between 3 and 35 degree
             maxY = bottomRight.y;
             maxYIndex = i;
         }
@@ -494,10 +490,6 @@ std::pair<bool, bool> ParkingSpaceDetector::checkSides(const cv::RotatedRect& ro
             interpolatedPointRight.x >= 0 && interpolatedPointRight.x < imgSize.width &&
             interpolatedPointRight.y >= 0 && interpolatedPointRight.y < imgSize.height) {
 
-            // Draw yellow dots at each interpolated point, IMPORT THE IMAGE FOR REPORT FOR PRINTING
-            //cv::circle(image, interpolatedPointLeft, 2, cv::Scalar(0, 255, 255), 1); // Yellow dot
-            //cv::circle(image, interpolatedPointRight, 2, cv::Scalar(0, 255, 255), 1); // Yellow dot
-
             // Check if the interpolated points are in the white area on the mask
             if (mask.at<uchar>(cv::Point(interpolatedPointLeft)) == 255)
                 touchedLeft = true;
@@ -505,8 +497,8 @@ std::pair<bool, bool> ParkingSpaceDetector::checkSides(const cv::RotatedRect& ro
             if (mask.at<uchar>(cv::Point(interpolatedPointRight)) == 255)
                 touchedRight = true;
         }
-        //cv::line(image, pointLeft, pointRight, cv::Scalar(0, 255, 0), 1);  // Green line with thickness 2
     }
+
     return std::make_pair(touchedLeft, touchedRight);
 }
 
@@ -514,7 +506,7 @@ std::pair<bool, bool> ParkingSpaceDetector::checkSides(const cv::RotatedRect& ro
 void ParkingSpaceDetector::removeOutliers(std::vector<cv::RotatedRect>& rotatedRects, const std::vector<std::pair<double, double>>& parkingSpaceLinesAngles,
                                           const cv::Size& imgSize, const int& margin, const std::vector<double>& aspectRatioThresholds) const {
 
-    const std::pair<double, double> FIRST_ANGLE_RANGE = parkingSpaceLinesAngles[0];
+    const std::pair<double, double> FIRST_ANGLE_RANGE = parkingSpaceLinesAngles[0]; // lines with positive angles
     std::vector<bool> outlier(rotatedRects.size(), false);
 
     // Create the mask to see where the rotated rectangle are
@@ -530,12 +522,12 @@ void ParkingSpaceDetector::removeOutliers(std::vector<cv::RotatedRect>& rotatedR
 
 
         // Second outliers : rotated rects with a specific angles that differ to much from the other types
-        double angle = rotatedRects[i].angle - 90;
+        double angle = rotatedRects[i].angle - 90; // rotated rects have a +90 degree difference from the lines
         double width = rotatedRects[i].size.width;
         double height = rotatedRects[i].size.height;
         double aspectRatio = std::max(width, height) / std::min(width, height);
 
-        // Depending on the angle different aspect ratio are checked
+        // Depending on the angle, different aspect ratio are checked
         if (isInRange(angle, FIRST_ANGLE_RANGE)) {
             if (aspectRatio < aspectRatioThresholds[0]) {
                 outlier[i] = true;
@@ -604,7 +596,7 @@ std::vector<std::vector<cv::RotatedRect>> ParkingSpaceDetector::matchParkingSpac
         while (iterator2 != boundingBoxesCandidates.end()) {
             cv::Point anotherCenter = iterator2->center;
 
-            if (isWithinRadius(centerParkingSpace, anotherCenter, radius)) {
+            if (isWithinRadius(centerParkingSpace, anotherCenter, radius)) { // if the center are close, it means it is the same parking space
                 parkingSpaceBoxes.push_back(*iterator2);
                 iterator2 = boundingBoxesCandidates.erase(iterator2);  // Erase and get the next iterator
             } else {
@@ -620,7 +612,6 @@ std::vector<std::vector<cv::RotatedRect>> ParkingSpaceDetector::matchParkingSpac
 
 
 std::vector<cv::RotatedRect> ParkingSpaceDetector::computeAverageRect(const std::vector<std::vector<cv::RotatedRect>>& boundingBoxesParkingSpaces) {
-
     std::vector<cv::RotatedRect> averages;
     for (const std::vector<cv::RotatedRect>& parkingSpace : boundingBoxesParkingSpaces) {
         unsigned int sumXCenter = 0, sumYCenter = 0;
@@ -665,7 +656,9 @@ void ParkingSpaceDetector::adjustPerspective(std::vector<cv::RotatedRect>& rects
 
         // Closer to the top (centerY close to 0) will have higher increment, closer to bottom (centerY close to image height) will have lower increment
         double incrementFactor = (1 - centerY / imgSize.height) * (maxIncrement - minIncrement) + minIncrement;
-        if (isInRange(rect.angle, parkingSpaceAngles[0])) { // 5 - 20 range
+
+        // Depending on the parking space angle we modify its height or width
+        if (isInRange(rect.angle, parkingSpaceAngles[0])) { // 95 - 110 range
             originalLength = rect.size.width;
             rect.size.width += incrementFactor;
             change = rect.size.width - originalLength;
@@ -680,8 +673,10 @@ void ParkingSpaceDetector::adjustPerspective(std::vector<cv::RotatedRect>& rects
 
     cv::Mat rotatedRectMask = ImageProcessing::createRectsMask(rects, imgSize);
     for (cv::RotatedRect& rect : rects) {
-        if (isInRange(rect.angle, parkingSpaceAngles[0])) { // 5 - 20 range
+        if (isInRange(rect.angle, parkingSpaceAngles[0])) { // 95 - 110 range
             std::pair<bool, bool> touched = checkSides(rect, rotatedRectMask, margin+50, imgSize);
+
+            // Depending where the free side of the parking space
             if (touched.first) { // The rect has the right side free, move it to the left
                 rect.center.y -= 5;
                 rect.center.x -= 15;
@@ -726,9 +721,11 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
     const double RADIUS = 35.5;
     const float IOU_THRESHOLD = 0.9;
 
-    cv::Mat clone2;
+    bool first = true;
     std::vector<cv::RotatedRect> boundingBoxesCandidates;
     cv::Size imgSize;
+
+    // For each empty image given, we build the bounding boxes. More empty images, more accurate the final bounding boxes will be
     for (const auto& iter : std::filesystem::directory_iterator(emptyFramesDir)) {
         std::string imgPath = iter.path().string();
 
@@ -738,8 +735,7 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
             std::cerr << "Error opening the image" << std::endl;
         }
         imgSize = input.size();
-        cv::Mat clone = input.clone(); // TODO eliminate
-        clone2 = input.clone();
+
 
         // LSH line detector
         cv::Mat gray;
@@ -756,6 +752,7 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
         std::vector<cv::Vec4i> filteredLines = filterLines(lines, input, PARKING_SPACE_LINES_ANGLES, PROXIMITY_THRESHOLDS,
                                                            MIN_LINE_LENGTH, ANGLE_THRESHOLD, WHITENESS_THRESHOLD);
 
+        // Match the two best lines for the same parking space together
         std::vector<std::pair<cv::Vec4i, cv::Vec4i>> matchedLines = matchLines(filteredLines, PARKING_SPACE_LINES_ANGLES,
                                                                                START_END_DISTANCE_THRESHOLD, END_START_DISTANCE_THRESHOLD,
                                                                                MAX_PARALLEL_ANGLE, DELTA_X_THRESHOLD, DELTA_Y_THRESHOLD);
@@ -763,17 +760,11 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
         // Build the rotated rects
         std::vector<cv::RotatedRect> rotatedRects = linesToRotatedRect(matchedLines);
 
-
         // Infer missing rects
         InferRotatedRects(rotatedRects, PARKING_SPACE_ANGLES[1]);
 
         // Remove rotated rects outliers
         removeOutliers(rotatedRects, PARKING_SPACE_LINES_ANGLES, imgSize, MARGIN, ASPECT_RATIO_THRESHOLDS);
-
-        // TODO Eliminate
-        /*Graphics::drawRotatedRects(clone, rotatedRects);
-        cv::imshow("Rotated Rectangles", clone);
-        cv::waitKey(0);*/
 
         boundingBoxesCandidates.insert(boundingBoxesCandidates.end(), rotatedRects.begin(), rotatedRects.end());
     }
@@ -795,7 +786,7 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
 
     // Adjust perspective
     adjustPerspective(finalBoundingBoxes, imgSize, PARKING_SPACE_ANGLES, MARGIN, MIN_LENGTH_INCREMENT, MAX_LENGTH_INCREMENT);
-
+    
 
     // Build the bounding boxes
     unsigned short parkNumber = 1;
@@ -813,7 +804,7 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
         bBoxes.push_back(bbox);
         finalBoundingBoxes.erase(iterRectHighestBR);
 
-        // Look for the connected/close parking spaces
+        // Look for the connected/close parking spaces in order to continue the labeling
         bool foundIntersecting;
         do {
             foundIntersecting = false;

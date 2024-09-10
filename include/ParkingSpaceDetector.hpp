@@ -126,7 +126,7 @@ private:
      *  @brief Matches the lines that form a parking space based on their geometric properties, such as angle similarity and proximity.
      *         The best candidate for each line is the one with the shortest valid distance.
      *
-     *  @param linesSupreme                vector of lines to be matched
+     *  @param finalLines                vector of lines to be matched
      *  @param parkingSpaceLinesAngles     vector with two pairs of allowable line angles
      *  @param startEndDistanceThreshold   maximum distance allowed between the start of one line and the end of another to be considered as a match
      *  @param endStartDistanceThreshold   maximum distance allowed between the end of one line and the start of another to be considered as a match
@@ -136,7 +136,7 @@ private:
      *
      *  @return a vector of paired lines, where each pair represents two lines that form a parking space
      */
-    std::vector<std::pair<cv::Vec4i, cv::Vec4i>> matchLines(const std::vector<cv::Vec4i>& linesSupreme, const std::vector<std::pair<double, double>>& parkingSpaceLinesAngles,
+    std::vector<std::pair<cv::Vec4i, cv::Vec4i>> matchLines(const std::vector<cv::Vec4i>& finalLines, const std::vector<std::pair<double, double>>& parkingSpaceLinesAngles,
                                                             const double& startEndDistanceThreshold, const double& endStartDistanceThreshold, const double& angleThreshold,
                                                             const double& deltaXThreshold, const double& deltaYThreshold) const;
 

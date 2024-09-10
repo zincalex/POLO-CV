@@ -75,15 +75,15 @@ int main(int argc, char** argv) {
 
         // First Metric
         cv::Mat zero = cv::Mat::zeros(10,10, CV_8UC3);
-        //Metrics metrics = Metrics(groundTruth.getBBoxes(), parkingStatus.getStatusPredictions(), zero);
+        Metrics metrics = Metrics(groundTruth.getBBoxes(), parkingStatus.getStatusPredictions(), zero);
 
-        //std::cout << "mAP: " << metrics.calculateMeanAveragePrecisionParkingSpaceLocalization() << std::endl;
+        std::cout << "mAP: " << metrics.calculateMeanAveragePrecisionParkingSpaceLocalization() << std::endl;
         //cv::waitKey(0);
         // Segmentation
 
         Segmentation seg = Segmentation(pathSequence0FramesDir, trainingDir ,parkingStatus.getStatusPredictions(),imgPath);
 
-        cv::imshow("Segmentation", seg.seeSegmentationResult());
+        //cv::imshow("Segmentation", seg.seeSegmentationResult());
         //cv::waitKey(0);
 
         // Second Metric

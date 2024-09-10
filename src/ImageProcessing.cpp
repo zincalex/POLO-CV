@@ -1,6 +1,6 @@
 #include "../include/ImageProcessing.hpp"
 
-cv::Mat ImageProcessing::optinalAreaROI(const cv::Size& imgSize) {
+cv::Mat ImageProcessing::optionalAreaROI(const cv::Size& imgSize) {
     cv::Mat mask = cv::Mat::zeros(imgSize, CV_8UC1);
 
     // Define ROI
@@ -109,6 +109,25 @@ cv::Mat ImageProcessing::minFilter(const cv::Mat& input, const int& kernel_size)
         }
     }
     return out;
+}
+
+cv::Mat ImageProcessing::convertColorMaskToGray(const cv::Mat& segmentationColorMask) {
+    cv::Mat classMask = cv::Mat::zeros(segmentationColorMask.size(), CV_8UC1);
+
+    for (unsigned int y = 0; y < segmentationColorMask.rows; ++y) {
+        for (unsigned int x = 0; x < segmentationColorMask.cols; ++x) {
+            cv::Vec3b color = segmentationColorMask.at<cv::Vec3b>(y, x);
+            if (color == cv::Vec3b(0, 0, 0)) {
+                classMask.at<uchar>(y, x) = 0; // Class 0: Nothing
+            } else if (color == cv::Vec3b(0, 0, 255) || color == cv::Vec3b(1, 1, 1)) {
+                classMask.at<uchar>(y, x) = 1; // Class 1: Car inside parking space
+            } else if (color == cv::Vec3b(0, 255, 0) || color == cv::Vec3b(2, 2, 2) ) {
+                classMask.at<uchar>(y, x) = 2; // Class 2: Car outside parking space
+            }
+        }
+    }
+
+    return classMask;
 }
 
 

@@ -1,0 +1,132 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"jsonFile" : "directory-.-f5ebdc15457944623624.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.8"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8
+					]
+				}
+			],
+			"name" : "",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "main",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "BBox::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-BBox-5637095f9e9f5a9bd004.json",
+					"name" : "BBox",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "Graphics::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-Graphics-366ad13291922cf231fe.json",
+					"name" : "Graphics",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "ImgProcessing::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ImgProcessing-9a732b1c567d5e1ebb71.json",
+					"name" : "ImgProcessing",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "Metrics::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-Metrics-1124db2d8b422bd0b296.json",
+					"name" : "Metrics",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "ParkingLotStatus::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ParkingLotStatus-9a6fe5a5ed5da5fbe606.json",
+					"name" : "ParkingLotStatus",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "ParkingSpaceDetector::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ParkingSpaceDetector-28208bef7c43fddca5ee.json",
+					"name" : "ParkingSpaceDetector",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "Segmentation::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-Segmentation-299555630d832694bfda.json",
+					"name" : "Segmentation",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "Xml::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-Xml-4b1abe5d305c45f2e8f9.json",
+					"name" : "Xml",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "main::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-main-e7ec75090d0c10e07a37.json",
+					"name" : "main",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/home/zincalex/Parking_lot_occupancy",
+		"source" : "/home/zincalex/Parking_lot_occupancy"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 3
+	}
+}

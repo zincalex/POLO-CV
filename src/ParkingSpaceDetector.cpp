@@ -150,7 +150,7 @@ std::vector<cv::Vec4i> ParkingSpaceDetector::filterLines(std::vector<cv::Vec4i>&
 
         // 4 CONTROL : remove lines that are in the optinal area
         bool flag = false;
-        cv::Mat optinalAreaMask = ImageProcessing::optinalAreaROI(referenceImage.size());
+        cv::Mat optinalAreaMask = ImageProcessing::optionalAreaROI(referenceImage.size());
         cv::LineIterator it(optinalAreaMask, start1, end1, 8);  // Iterate through points along the line
 
         for (unsigned int j = 0; j < it.count; ++j, ++it) {
@@ -732,7 +732,7 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
         // Load the image
         cv::Mat input = cv::imread(imgPath);
         if (input.empty()) {
-            std::cerr << "Error opening the image" << std::endl;
+            throw std::invalid_argument("Error opening the image: Check whether the first argument is the correct path ----> ParkingLot_dataset/sequence0/frames");
         }
         imgSize = input.size();
 
@@ -787,7 +787,7 @@ ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFra
     // Adjust perspective
     adjustPerspective(finalBoundingBoxes, imgSize, PARKING_SPACE_ANGLES, MARGIN, MIN_LENGTH_INCREMENT, MAX_LENGTH_INCREMENT);
     
-
+    // TODO aggiornare numerazione che cerchi il box adiacente più vicino, se entro tot ok, altrimenti passa al più basso
     // Build the bounding boxes
     unsigned short parkNumber = 1;
     while (!finalBoundingBoxes.empty() && parkNumber < 38) { // at max there are 37 parking spaces, duplicates are already handled in removeOutliers

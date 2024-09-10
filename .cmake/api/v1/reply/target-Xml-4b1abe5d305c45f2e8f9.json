@@ -3,7 +3,7 @@
 	"artifacts" : 
 	[
 		{
-			"path" : "libParkingLotStatus.a"
+			"path" : "libXml.a"
 		}
 	],
 	"backtrace" : 1,
@@ -26,7 +26,7 @@
 			{
 				"command" : 0,
 				"file" : 0,
-				"line" : 18,
+				"line" : 38,
 				"parent" : 0
 			},
 			{
@@ -40,12 +40,6 @@
 	"compileGroups" : 
 	[
 		{
-			"compileCommandFragments" : 
-			[
-				{
-					"fragment" : "-g -std=gnu++17 -fdiagnostics-color=always"
-				}
-			],
 			"includes" : 
 			[
 				{
@@ -68,9 +62,9 @@
 			]
 		}
 	],
-	"id" : "ParkingLotStatus::@6890427a1f51a3e7e1df",
-	"name" : "ParkingLotStatus",
-	"nameOnDisk" : "libParkingLotStatus.a",
+	"id" : "Xml::@6890427a1f51a3e7e1df",
+	"name" : "Xml",
+	"nameOnDisk" : "libXml.a",
 	"paths" : 
 	{
 		"build" : ".",
@@ -97,13 +91,13 @@
 	[
 		{
 			"backtrace" : 1,
-			"path" : "include/ParkingLotStatus.hpp",
+			"path" : "include/XMLReader.hpp",
 			"sourceGroupIndex" : 0
 		},
 		{
 			"backtrace" : 1,
 			"compileGroupIndex" : 0,
-			"path" : "src/ParkingLotStatus.cpp",
+			"path" : "src/XMLReader.cpp",
 			"sourceGroupIndex" : 1
 		}
 	],

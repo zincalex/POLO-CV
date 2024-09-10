@@ -10,7 +10,7 @@ public:
     ImageProcessing() = delete;  // Prevent instantiation
 
 
-    static cv::Mat optinalAreaROI(const cv::Size& imgSize);
+    static cv::Mat optionalAreaROI(const cv::Size& imgSize);
     static cv::Mat createRectsMask(const std::vector<cv::RotatedRect>& rotatedRects, const cv::Size& imgSize);
     static cv::Mat createROI(const cv::Mat& image, const BoundingBox& bBox);
 
@@ -21,6 +21,8 @@ public:
     static cv::Mat morphologicalSkeleton(const cv::Mat& binaryImg);
     static cv::Mat applyCLAHE(const cv::Mat& input);
     static cv::Mat createMaskDarkColors(const cv::Mat& image);
+
+    static cv::Mat convertColorMaskToGray(const cv::Mat& segmentationColorMask);
 };
 
 #endif

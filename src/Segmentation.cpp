@@ -29,14 +29,14 @@ cv::Mat Segmentation::backgroundSubtractionMask(const cv::Mat &empty_parking, co
     cv::Mat diff;
     cv::absdiff(busy_parking, empty_parking, diff); //used absdiff to avoid possible negative numbers
     cv::Mat bg1_mask;
-    cv::threshold(diff, bg1_mask, 70, 255, cv::THRESH_BINARY);
+    cv::threshold(diff, bg1_mask, 60, 255, cv::THRESH_BINARY);
     //use tresholding to get the mask
 
-    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(30, 30));
-    cv::morphologyEx(bg1_mask, bg1_mask, cv::MORPH_CLOSE, kernel);
-    cv::morphologyEx(bg1_mask, bg1_mask, cv::MORPH_OPEN, kernel);
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(20, 20));
+    cv::morphologyEx(bg1_mask, bg1_mask, cv::MORPH_DILATE, kernel);
+    //cv::morphologyEx(bg1_mask, bg1_mask, cv::MORPH_CLOSE, kernel);
     //use a huge morphological operation, in this case this mask only removes a bigger portion of the background to help mog2
-    cv::imshow("bgelim", bg1_mask);
+    //cv::imshow("bgelim", bg1_mask);
     return bg1_mask;
 }
 
@@ -57,7 +57,7 @@ cv::Mat Segmentation::smallContoursElimination(const cv::Mat& input_mask, const 
     return in_mask;
 }
 
-cv::Ptr<cv::BackgroundSubtractorMOG2> Segmentation::trainBackgroundModel(const std::vector<cv::String>& backgroundImages) {
+cv::Ptr<cv::BackgroundSubtractorMOG2> Segmentation::trainBackgroundModel(const std::vector<cv::String> &backgroundImages, const int &color_conversion_code) {
     //check for mog2 dataset - mandatory for the segmentation, in c++ no possibile way of saving an already trained mog2 bg remover
     if (backgroundImages.empty()) {
         std::cerr << "Error while loading training dataset, make sure the folder /ParkingLot_dataset/mog2_training_sequence exists and has training images inside" << std::endl;
@@ -68,6 +68,8 @@ cv::Ptr<cv::BackgroundSubtractorMOG2> Segmentation::trainBackgroundModel(const s
 
     for (const auto &imagePath: backgroundImages) {
         cv::Mat image = cv::imread(imagePath);
+        if(color_conversion_code != 0)
+            cv::cvtColor(image, image, color_conversion_code);
 
         // using apply with a learning rate different from 0 executes the training, -1 uses automatic lr
         cv::Mat fgMask;
@@ -104,7 +106,7 @@ cv::Mat Segmentation::getForegroundMaskMOG2(cv::Ptr<cv::BackgroundSubtractorMOG2
     }
     //draws filled polygons from the mask to fill some gaps in the mask
     //cv::morphologyEx(mog2_final_mask, mog2_final_mask, cv::MORPH_DILATE, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 6)));
-    cv::imshow("TEST", mog2_final_mask);
+    //cv::imshow("TEST", mog2_final_mask);
     return mog2_final_mask;
 }
 
@@ -166,38 +168,64 @@ cv::Mat Segmentation::getSegmentationMaskBinary() {
 int Segmentation::dynamicContoursThresh(const cv::Mat &mask_to_filter) {
     int num_mask_pixels = cv::countNonZero(mask_to_filter);
     int threshold;
-    if (num_mask_pixels < 45000){
-        threshold = 1000;
+    if (num_mask_pixels < 50000){
+        threshold = 1500;
     } else {
         threshold = 300;
     }
-    std::cout << threshold << std::endl;
     return  threshold;
 }
+
+
 
 Segmentation::Segmentation(const std::filesystem::path &emptyFramesDir, const std::filesystem::path &mogTrainingDir,const std::vector<BoundingBox>& parkingBBoxes,const std::string& imageName) {
         //parameter loading and definition of needed support matrices
         cv::Mat parking_with_cars_col = cv::imread(imageName);
+        cv::Mat parking_hsv;
+        cv::cvtColor(parking_with_cars_col, parking_hsv, cv::COLOR_BGR2Lab);
         cv::Mat parking_with_cars;
         cv::cvtColor(parking_with_cars_col, parking_with_cars, cv::COLOR_BGR2GRAY);
         cv::Mat src_clean = parking_with_cars_col.clone(); //used only for final mask application
         cv::Mat bgElimMask;
-        cv::Mat empty_parking = averageEmptyImages(emptyFramesDir);
         cv::Mat parking_masked;
         std::vector<cv::String> backgroundImages;
         cv::Mat parkingSpaceMask = cv::Mat::zeros(parking_with_cars.size(), CV_8UC1);
         cv::Mat bgSubctMask = cv::Mat::zeros(parking_with_cars.size(), CV_8UC1);
         parkingSpaceMask = getBBoxMask(parkingBBoxes, parkingSpaceMask);
 
-        //load images and execute MOG2 training and application
-        cv::glob(mogTrainingDir, backgroundImages);
-        cv::Ptr<cv::BackgroundSubtractorMOG2> mog2 = trainBackgroundModel(backgroundImages);
-        cv::Mat Mog2Mask = getForegroundMaskMOG2(mog2, parking_with_cars_col);
+        static bool trained = false;
+        static cv::Mat empty_parking;
+        static cv::Ptr<cv::BackgroundSubtractorMOG2> mog2bgr;
+        static cv::Ptr<cv::BackgroundSubtractorMOG2> mog2hsv;
+
+        if (!trained) {
+            std::cout << "WAIT - Executing training, action will be ran only once" << std::endl;
+            //load images and execute MOG2 training and application
+            cv::glob(mogTrainingDir, backgroundImages);
+            mog2hsv = trainBackgroundModel(backgroundImages, cv::COLOR_BGR2Lab);
+            mog2bgr = trainBackgroundModel(backgroundImages);
+            empty_parking = averageEmptyImages(mogTrainingDir);
+            trained = true;
+            std::cout << "READY - Training finished" << std::endl;
+        }
+
+
+
+        cv::Mat mog2MaskHSV = getForegroundMaskMOG2(mog2hsv, parking_hsv);
+        mog2MaskHSV = smallContoursElimination(mog2MaskHSV, 300);
+        cv::Mat mog2MaskBGR = getForegroundMaskMOG2(mog2bgr, parking_with_cars_col);
+        cv::Mat merge;
+        cv::bitwise_or(mog2MaskHSV, mog2MaskBGR, merge);
+        cv::imshow("BGR", mog2MaskBGR);
+        cv::imshow("HSV", mog2MaskHSV);
+        //Mog2Mask = smallContoursElimination(bgSubctMask, 100);
 
         //execute background subtraction and use bw& to merge the masks making the mog2 more robust to illumination change
-        //bgElimMask = backgroundSubtractionMask(empty_parking, parking_with_cars);
-        //cv::bitwise_and(bgElimMask, Mog2Mask, bgSubctMask);
-        bgSubctMask = Mog2Mask.clone();
+        bgElimMask = backgroundSubtractionMask(empty_parking, parking_with_cars);
+        //cv::imshow("bgelim", bgElimMask);
+        //cv::imshow("mog2", Mog2Mask);
+        cv::bitwise_and(bgElimMask, merge, bgSubctMask);
+        //bgSubctMask = Mog2Mask.clone();
 
         //final mask refinement
         //morphological to clean the final masks as best as possible
@@ -205,15 +233,16 @@ Segmentation::Segmentation(const std::filesystem::path &emptyFramesDir, const st
 
         //removes the small noise
         int small_contour = dynamicContoursThresh(bgSubctMask);
-        bgSubctMask = smallContoursElimination(bgSubctMask, small_contour);
-        cv::morphologyEx(bgSubctMask, bgSubctMask, cv::MORPH_DILATE, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(8, 7)));
+        bgSubctMask = smallContoursElimination(bgSubctMask, 1500);
+        //std::cout << cv::countNonZero(bgSubctMask) << std::endl; //300k+
 
         //assign variables for access
         final_binary_mask = bgSubctMask.clone();
         final_mask = getColorMask(bgSubctMask, parkingSpaceMask);
         final_image = Graphics::maskApplication(src_clean, final_mask);
-
 }
+
+
 
 
 

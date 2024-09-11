@@ -52,14 +52,16 @@ private:
     cv::Mat final_image;
     cv::Mat final_binary_mask;
 
+
     /**
      * @brief Uses the images in the train sequence to train the MOG2 background subtractor.
      *
      * @param backgroundImages set of training images
+     * @param color_conversion_code defaults to 0 for BGR images, can accept any cv COLOR_BGR... for other color spaces
      *
      * @return pointer to a trained BackgroundSubtractorMOG2 object
      */
-    cv::Ptr<cv::BackgroundSubtractorMOG2> trainBackgroundModel(const std::vector<cv::String>& backgroundImages);
+    cv::Ptr<cv::BackgroundSubtractorMOG2> trainBackgroundModel(const std::vector<cv::String>& backgroundImages, const int& color_conversion_code = 0);
 
     /**
      * @brief Apply the BackgroundSubtractorMOG2 to an image of a busy parking lot, discarding the possible foreground and keeping only the foreground mask.

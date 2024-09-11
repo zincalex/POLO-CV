@@ -92,10 +92,15 @@ int main(int argc, char** argv) {
         Graphics::applyMap(clone, parkingStatus.getOccupiedParkingSpaces());
 
         // Show results
+        std::cout << "\n Working on image " << filenameExtension  << " for the " << framePath << std::endl;
         cv::imshow("Predicted parking lot status", parkingStatus.seeParkingLotStatus());
+        cv::waitKey(0);
         cv::imshow("Segmentation", seg.getSegmentationResult());
-        std::cout << "mAP: " << metrics.calculateMeanAveragePrecisionParkingSpaceLocalization() << std::endl;
-        std::cout << "mIoU: " << metrics.calculateMeanIntersectionOverUnionSegmentation() << std::endl;
+        cv::waitKey(0);
+        std::cout << "----------------     METRICS     ----------------" << std::endl;
+        std::cout << "Parking space localization  ----> mAP  = " << metrics.calculateMeanAveragePrecisionParkingSpaceLocalization() << std::endl;
+        std::cout << "Car segmentation            ----> mIoU = " << metrics.calculateMeanIntersectionOverUnionSegmentation() << std::endl;
+        cv::waitKey(0);
         cv::imshow("2DMap", clone);
         cv::waitKey(0);
     }

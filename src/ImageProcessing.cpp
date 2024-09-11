@@ -1,7 +1,6 @@
 /**
  * @author Alessandro Viespoli 2120824
  */
-
 #include "../include/ImageProcessing.hpp"
 
 cv::Mat ImageProcessing::optionalAreaROI(const cv::Size& imgSize) {
@@ -13,7 +12,7 @@ cv::Mat ImageProcessing::optionalAreaROI(const cv::Size& imgSize) {
     cv::Point2f vertices[4];
     std::vector<cv::Point> contour;
     roiRect.points(vertices);
-    for (auto vertex : vertices) { contour.push_back(vertex); }
+    for (const cv::Point2f& vertex : vertices) { contour.push_back(vertex); }
     cv::fillConvexPoly(mask, contour, cv::Scalar(255));
 
     return mask;
@@ -59,7 +58,7 @@ cv::Mat ImageProcessing::createRectsMask(const std::vector<cv::RotatedRect>& rot
         rect.points(vertices);
 
         std::vector<cv::Point> verticesVector(4);
-        for (unsigned int j = 0; j < 4; j++)
+        for (unsigned int j = 0; j < 4; ++j)
             verticesVector[j] = vertices[j];
         cv::fillPoly(mask, verticesVector, cv::Scalar(255));
     }
@@ -71,8 +70,8 @@ cv::Mat ImageProcessing::createRectsMask(const std::vector<cv::RotatedRect>& rot
 cv::Mat ImageProcessing::createMaskDarkColors(const cv::Mat& image) {
     cv::Mat mask = cv::Mat::zeros(image.size(), CV_8U);
 
-    for (int y = 0; y < image.rows; ++y) {
-        for (int x = 0; x < image.cols; ++x) {
+    for (unsigned int y = 0; y < image.rows; ++y) {
+        for (unsigned int x = 0; x < image.cols; ++x) {
             cv::Vec3b bgrPixel = image.at<cv::Vec3b>(y, x);
 
             // Check if all BGR components are less than or equal to 30

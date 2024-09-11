@@ -1,7 +1,6 @@
 /**
  * @author Alessandro Viespoli 2120824
  */
-
 #ifndef METRICS_HPP
 #define METRICS_HPP
 
@@ -10,6 +9,7 @@
 
 #include "ImageProcessing.hpp"
 #include "BoundingBox.hpp"
+
 
 class Metrics {
 public:
@@ -43,11 +43,12 @@ public:
 
 
 private:
+    const double IOU_THRESHOLD = 0.5;
+
     std::vector<BoundingBox> groundTruth;
     std::vector<BoundingBox> bBoxesPrediction;
     cv::Mat trueSegmentationMask;
     cv::Mat segmentationColorMask;
-
 
     /**
      * @brief Calculates the Intersection over Union (IoU) between two rotated rotated rects coming from the BoundingBox object.

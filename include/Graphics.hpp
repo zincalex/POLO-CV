@@ -1,14 +1,13 @@
 /**
  * @author Francesco Colla 2122543
  */
-
 #ifndef GRAPHICS_HPP
 #define GRAPHICS_HPP
 
 #include <vector>
-#include <set>
+
 #include <opencv2/imgproc.hpp>
-#include <opencv2/highgui.hpp>
+
 
 class Graphics {
 public:

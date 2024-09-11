@@ -1,19 +1,24 @@
 /**
  * @author Alessandro Viespoli 2120824
  */
-
 #include "../include/Metrics.hpp"
 
-double Metrics::calculateMeanAveragePrecisionParkingSpaceLocalization() const {
-    const double IOU_THRESHOLD = 0.5;
+Metrics::Metrics(const std::vector<BoundingBox>& groundTruth, const std::vector<BoundingBox>& bBoxesPrediction,
+                 const cv::Mat& trueSegmentationMask, const cv::Mat& segmentationColorMask) {
+    this->groundTruth = groundTruth;
+    this->bBoxesPrediction = bBoxesPrediction;
+    this->trueSegmentationMask = trueSegmentationMask;
+    this->segmentationColorMask = segmentationColorMask;
+}
 
+
+double Metrics::calculateMeanAveragePrecisionParkingSpaceLocalization() const {
     std::vector<int> totalGroundTruths = {0,0};             // total number of empty and full parking space
     std::vector<std::vector<double>> precisions(2);      // cumulative precision values per class
     std::vector<std::vector<double>> recalls(2);         // cumulative recall values per class
 
     // AP calculated using the 11 point interpolation method
     std::vector<double> recall_levels = {0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0};
-
     std::vector<double> averagePrecisions(2, 0);
 
     // Divide the predictions in the 2 classes -----> 0 no car, 1  car
@@ -61,7 +66,6 @@ double Metrics::calculateMeanAveragePrecisionParkingSpaceLocalization() const {
         }
     }
 
-
     // Compute the AP for each class
     for (unsigned int& i : classes) {
         double ap = 0.0;
@@ -69,16 +73,14 @@ double Metrics::calculateMeanAveragePrecisionParkingSpaceLocalization() const {
         for (double recall_level : recall_levels) { // Iterate through each recall level
             double max_precision = 0.0;
 
-            for (unsigned int k = 0; k < recalls[i].size(); ++k) { // for each cumulative value stored
+            for (unsigned int k = 0; k < recalls[i].size(); ++k)  // for each cumulative value stored
                 if (recalls[i][k] >= recall_level)
                     max_precision = std::max(max_precision, precisions[i][k]);
-            }
 
             ap += max_precision;  // Add the maximum precision for this recall level
         }
         averagePrecisions[i] = ap / 11.0;   // 11 Point Interpolation Method
     }
-
 
     // Compute mAP
     double mean = 0.0;
@@ -159,13 +161,4 @@ double Metrics::calculateIoUSegmentation(const cv::Mat& groundTruthMask, const c
 
     // In the case where the G.T has a value while the prediction has not (intersection is zero), and viceversa, the return value is 0
     return static_cast<double>(intersectionCount) / static_cast<double>(unionCount);
-}
-
-
-Metrics::Metrics(const std::vector<BoundingBox>& groundTruth, const std::vector<BoundingBox>& bBoxesPrediction,
-                 const cv::Mat& trueSegmentationMask, const cv::Mat& segmentationColorMask) {
-    this->groundTruth = groundTruth;
-    this->bBoxesPrediction = bBoxesPrediction;
-    this->trueSegmentationMask = trueSegmentationMask;
-    this->segmentationColorMask = segmentationColorMask;
 }

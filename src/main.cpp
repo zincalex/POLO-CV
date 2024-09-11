@@ -77,32 +77,27 @@ int main(int argc, char** argv) {
         XMLReader groundTruth = XMLReader(xmlPath);
         cv::Mat segmentationGTMask = cv::imread(groundTruthMaskPath); //BGR image
 
-        // Given the bounding boxes, detect cars
-        cv::Mat parkingImg = cv::imread(imgPath);
-        ParkingLotStatus parkingStatus = ParkingLotStatus(parkingImg, bBoxes);
-        cv::imshow("Predicted parking lot status", parkingStatus.seeParkingLotStatus());
-        cv::waitKey(0);
-
-
         // Segmentation
-        Segmentation seg = Segmentation(pathSequence0FramesDir, trainingDir ,parkingStatus.getStatusPredictions(),imgPath);
-        cv::imshow("Segmentation", seg.getSegmentationResult());
+        Segmentation seg = Segmentation(pathSequence0FramesDir, trainingDir ,bBoxes,imgPath);
 
+        // Car detection
+        cv::Mat parkingImg = cv::imread(imgPath);
+        ParkingLotStatus parkingStatus = ParkingLotStatus(parkingImg, bBoxes, seg.getMOG2Labmask());
 
         // Metrics
         Metrics metrics = Metrics(groundTruth.getBBoxes(), parkingStatus.getStatusPredictions(), segmentationGTMask, seg.getSegmentationMaskWithClasses());
-        std::cout << "mAP: " << metrics.calculateMeanAveragePrecisionParkingSpaceLocalization() << std::endl;
-        std::cout << "mIoU: " << metrics.calculateMeanIntersectionOverUnionSegmentation() << std::endl;
-        cv::waitKey(0);
 
         // 2D Map
         cv::Mat clone = parkingImg.clone();
         Graphics::applyMap(clone, parkingStatus.getOccupiedParkingSpaces());
+
+        // Show results
+        cv::imshow("Predicted parking lot status", parkingStatus.seeParkingLotStatus());
+        cv::imshow("Segmentation", seg.getSegmentationResult());
+        std::cout << "mAP: " << metrics.calculateMeanAveragePrecisionParkingSpaceLocalization() << std::endl;
+        std::cout << "mIoU: " << metrics.calculateMeanIntersectionOverUnionSegmentation() << std::endl;
         cv::imshow("2DMap", clone);
         cv::waitKey(0);
-
     }
-
-
     return 0;
 }

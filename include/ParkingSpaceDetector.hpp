@@ -1,27 +1,29 @@
 /**
  * @author Alessandro Viespoli 2120824
  */
-
 #ifndef PARKINGSPACEDETECTION_HPP
 #define PARKINGSPACEDETECTION_HPP
 
 #include <vector>
 #include <filesystem>
-#include <limits>
 #include <opencv2/imgproc.hpp>
-#include <opencv4/opencv2/highgui.hpp>
 
 #include "BoundingBox.hpp"
-#include "ImageProcessing.hpp"
-#include "Graphics.hpp"
+
 
 class ParkingSpaceDetector {
 public:
 
     /**
      * @brief Constructor to initialize the class for parking Space detector.
+     *        The method calculate the bounding boxes for each empty image inside the given directory, then it
+     *        proceds to aggregate the bounding boxes by first checking which represents the same parking space
+     *        and then make and avereage. At that point prospective adjustment are made, for later classification, and
+     *        number labels are assigned to each parking space.
      *
      * @param emptyFramesDir path to the directory of the image(s) without any car ----> sequence0
+     *
+     * @throw std::invalid_argument if there are no images inside the given directory
      */
     ParkingSpaceDetector(const std::filesystem::path& emptyFramesDir);
 
@@ -33,7 +35,6 @@ public:
 
 private:
     std::vector<BoundingBox> bBoxes;  // BoundingBox objects that represent the parking spaces
-
 
     /**
      * @brief Calculate the length of a line.

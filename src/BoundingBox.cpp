@@ -1,8 +1,15 @@
 /**
  * @author Alessandro Viespoli 2120824
  */
-
 #include "../include/BoundingBox.hpp"
+
+BoundingBox::BoundingBox(const cv::RotatedRect& rect, const unsigned short& number, const bool& occupied) {
+    this->center = rect.center;
+    this->rect = rect;
+    this->number = number;
+    this->occupied = occupied;
+}
+
 
 void BoundingBox::updateState() {
     // occupied = 0 ---> parking space empty
@@ -25,14 +32,8 @@ cv::Point BoundingBox::getTlCorner() const {
             topLeft = vertices[i];
         }
     }
-
     return topLeft;
 }
 
 
-BoundingBox::BoundingBox(const cv::RotatedRect& rect, const unsigned short& number, const bool& occupied) {
-    this->center = rect.center;
-    this->rect = rect;
-    this->number = number;
-    this->occupied = occupied;
-}
+

@@ -1,13 +1,14 @@
 /**
  * @author Alessandro Viespoli 2120824
  */
-
 #ifndef IMAGEPROCESSING_HPP
 #define IMAGEPROCESSING_HPP
 
+#include <vector>
 #include <opencv2/imgproc.hpp>
 
 #include "BoundingBox.hpp"
+
 
 class ImageProcessing {
 public:
@@ -55,12 +56,12 @@ public:
     /**
      * @brief Converts a color segmentation mask to a grayscale mask with class labels.
      *
-     * @param segmentationColorMask  input color segmentation mask in BGR format.
+     * @param segmentationColorMask  input color segmentation mask in BGR format
      *
-     * @return a grayscale mask where pixel values represent class IDs.
-     *                  - 0: Nothing (background)
-     *                  - 1: Car inside parking space
-     *                  - 2: Car outside parking space
+     * @return a grayscale mask where pixel values represent class IDs
+     *             - 0: Nothing (background)
+     *             - 1: Car inside parking space
+     *             - 2: Car outside parking space
      */
     static cv::Mat convertColorMaskToGray(const cv::Mat& segmentationColorMask);
 

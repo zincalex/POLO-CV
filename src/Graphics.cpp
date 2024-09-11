@@ -1,9 +1,10 @@
 /**
  * @author Francesco Colla 2122543
  */
+#include <set>
+#include <opencv2/highgui.hpp>
 
 #include "../include/Graphics.hpp"
-
 
 void Graphics::applyMap(cv::Mat& src, const std::vector<unsigned short> &occupiedParkingSpaces) {
     // Get the rectangles that represent the map configuration

@@ -1,8 +1,150 @@
 /**
  * @author Alessandro Viespoli 2120824
  */
+#include <limits>
+#include <opencv2/highgui.hpp>
 
 #include "../include/ParkingSpaceDetector.hpp"
+#include "../include/ImageProcessing.hpp"
+
+ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFramesDir) {
+    // CONSTANT PARAMETERS, only used during initialization
+    // Main angle ranges of the parking lines (can be adjusted accordingly)
+    const std::vector<std::pair<double, double>> PARKING_SPACE_LINES_ANGLES = {std::make_pair(5.0, 20.0), std::make_pair(-87, -55.0)};
+    const std::vector<std::pair<double, double>> PARKING_SPACE_ANGLES = {std::make_pair(95.0, 110.0), std::make_pair(3, 35)};         // Same as above but with +90
+
+    // Line filter parameters
+    const std::vector<double> PROXIMITY_THRESHOLDS = {25.0, 15.0};    // proximity distance to consider 2 lines close, (angle dependant)
+    const double MIN_LINE_LENGTH = 20;
+    const double ANGLE_THRESHOLD = 20.0;                              // difference to consider 2 angles similar
+    const double WHITENESS_THRESHOLD = 0.1;                           // used for eliminate some lines
+
+    // Matching lines parameters
+    const double START_END_DISTANCE_THRESHOLD = 85.0;                 // max distance between the start of the first line and the end of the second line
+    const double END_START_DISTANCE_THRESHOLD = 120.0;                // max distance between the end of the first line and the start of the second line
+    const double DELTA_X_THRESHOLD = 20.0;
+    const double DELTA_Y_THRESHOLD = 15.0;
+    const double MAX_PARALLEL_ANGLE = 10.0;                           // max angle to consider two lines as parallel
+
+    // Outliers elimination parameters
+    const std::vector<double> ASPECT_RATIO_THRESHOLDS = {1.4, 1.9};   // minimum aspect ratio for the rotated rects based on the angle of the parking space
+    const int MARGIN = 90;                                            // distance to consider from the edges of a rotated rect
+
+    // Perspective parameters
+    const unsigned short MIN_LENGTH_INCREMENT = 5;
+    const unsigned short MAX_LENGTH_INCREMENT = 20;
+
+    // Other parameters
+    const double RADIUS = 35.5;
+    const float IOU_THRESHOLD = 0.9;
+
+    std::vector<cv::RotatedRect> boundingBoxesCandidates;
+    cv::Size imgSize;
+    // For each empty image given, we build the bounding boxes. More empty images, more accurate the final bounding boxes will be
+    for (const auto& iter : std::filesystem::directory_iterator(emptyFramesDir)) {
+        std::string imgPath = iter.path().string();
+
+        // Load the image
+        cv::Mat input = cv::imread(imgPath);
+        if (input.empty()) {
+            throw std::invalid_argument("Error opening the image: Check whether the first argument is the correct path ----> ParkingLot_dataset/sequence0/frames");
+        }
+        imgSize = input.size();
+
+
+        // LSH line detector
+        cv::Mat gray;
+        std::vector<cv::Vec4i> lines;
+        cv::Ptr<cv::LineSegmentDetector> lsd = cv::createLineSegmentDetector(cv::LSD_REFINE_ADV);
+        cvtColor(input, gray, cv::COLOR_BGR2GRAY);
+        lsd->detect(gray, lines);
+
+        // Make the start and end of the lines uniform
+        for (unsigned int i = 0; i < lines.size(); ++i)
+            lines[i] = standardizeLine(lines[i]);
+
+        // Filter the lines
+        std::vector<cv::Vec4i> filteredLines = filterLines(lines, input, PARKING_SPACE_LINES_ANGLES, PROXIMITY_THRESHOLDS,
+                                                           MIN_LINE_LENGTH, ANGLE_THRESHOLD, WHITENESS_THRESHOLD);
+
+        // Match the two best lines for the same parking space together
+        std::vector<std::pair<cv::Vec4i, cv::Vec4i>> matchedLines = matchLines(filteredLines, PARKING_SPACE_LINES_ANGLES,
+                                                                               START_END_DISTANCE_THRESHOLD, END_START_DISTANCE_THRESHOLD,
+                                                                               MAX_PARALLEL_ANGLE, DELTA_X_THRESHOLD, DELTA_Y_THRESHOLD);
+
+        // Build the rotated rects
+        std::vector<cv::RotatedRect> rotatedRects = linesToRotatedRect(matchedLines);
+
+        // Infer missing rects
+        InferRotatedRects(rotatedRects, PARKING_SPACE_ANGLES[1]);
+
+        // Remove rotated rects outliers
+        removeOutliers(rotatedRects, PARKING_SPACE_LINES_ANGLES, imgSize, MARGIN, ASPECT_RATIO_THRESHOLDS);
+
+        boundingBoxesCandidates.insert(boundingBoxesCandidates.end(), rotatedRects.begin(), rotatedRects.end());
+    }
+
+
+    // Now all the bounding boxes for all the images in the sequence0 folder have been calculated. Now we merge together by making the average
+    // See which rotated rects represents the same parking space
+    std::vector<std::vector<cv::RotatedRect>> boundingBoxesParkingSpaces = matchParkingSpaces(boundingBoxesCandidates, RADIUS);
+
+    // For all valid boxes, make the average
+    std::vector<cv::RotatedRect> finalBoundingBoxes = computeAverageRect(boundingBoxesParkingSpaces);
+
+    // Sort the boxes in order to make the labeling consistent
+    std::sort(finalBoundingBoxes.begin(), finalBoundingBoxes.end(),
+              [&](const cv::RotatedRect& rect1, const cv::RotatedRect& rect2) {
+                  cv::Point2f bottomRight1 = getBottomRight(rect1);
+                  cv::Point2f bottomRight2 = getBottomRight(rect2);
+                  return bottomRight1.y > bottomRight2.y;
+              });
+
+    // Adjust perspective
+    adjustPerspective(finalBoundingBoxes, imgSize, PARKING_SPACE_ANGLES, MARGIN, MIN_LENGTH_INCREMENT, MAX_LENGTH_INCREMENT);
+
+
+    // Build the bounding boxes
+    unsigned short parkNumber = 1;
+    while (!finalBoundingBoxes.empty() && parkNumber < 38) { // at max there are 37 parking spaces, duplicates are already handled in removeOutliers
+
+        // Find the bounding box with the bottom-right corner with the highest y value
+        auto iterRectHighestBR = std::max_element(finalBoundingBoxes.begin(), finalBoundingBoxes.end(),
+                                                  [this](const cv::RotatedRect &a, const cv::RotatedRect &b) {
+                                                      return getBottomRight(a).y <
+                                                             getBottomRight(b).y;  // Compare the y-values of the bottom-right corners
+                                                  }
+        );
+
+        BoundingBox bbox = BoundingBox(*iterRectHighestBR, parkNumber++);
+        bBoxes.push_back(bbox);
+        finalBoundingBoxes.erase(iterRectHighestBR);
+
+        // Look for the connected/close parking spaces in order to continue the labeling
+        bool foundIntersecting;
+        do {                                // loop done at least once
+            foundIntersecting = false;
+
+            for (auto it = finalBoundingBoxes.begin(); it != finalBoundingBoxes.end(); ++it) {
+                BoundingBox currentBBox(*it, 0);
+
+                // Check if the top-left of the current bounding box intersects with the last bounding box looked (or in case if top-left corner is close to the center)
+                if (isTopLeftInside(bbox, currentBBox) || isWithinRadius(bbox.getTlCorner(), currentBBox.getCenter(), RADIUS+10)) {
+                    BoundingBox newBbox(*it, parkNumber++);
+                    bBoxes.push_back(newBbox);
+                    finalBoundingBoxes.erase(it);
+
+                    // Update the bbox reference to continue checking for intersections from this new box
+                    bbox = newBbox;
+
+                    foundIntersecting = true;  // We found an intersection, so we'll check again in the next loop iteration
+                    break;
+                }
+            }
+        } while (foundIntersecting && parkNumber < 38);
+    }
+}
+
 
 double ParkingSpaceDetector::calculateLineLength(const cv::Vec4i& line) const {
     return std::sqrt(std::pow(line[2] - line[0], 2) + std::pow(line[3] - line[1], 2));
@@ -690,145 +832,5 @@ void ParkingSpaceDetector::adjustPerspective(std::vector<cv::RotatedRect>& rects
                 rect.center.x += 15;
             }
         }
-    }
-}
-
-
-ParkingSpaceDetector::ParkingSpaceDetector(const std::filesystem::path& emptyFramesDir) {
-    // PARAMETERS
-    // Main angle ranges of the parking lines (can be adjusted accordingly)
-    const std::vector<std::pair<double, double>> PARKING_SPACE_LINES_ANGLES = {std::make_pair(5.0, 20.0), std::make_pair(-87, -55.0)};
-    const std::vector<std::pair<double, double>> PARKING_SPACE_ANGLES = {std::make_pair(95.0, 110.0), std::make_pair(3, 35)};         // Same as above but with +90
-
-    // Line filter parameters
-    const std::vector<double> PROXIMITY_THRESHOLDS = {25.0, 15.0};    // proximity distance to consider 2 lines close, (angle dependant)
-    const double MIN_LINE_LENGTH = 20;
-    const double ANGLE_THRESHOLD = 20.0;                              // difference to consider 2 angles similar
-    const double WHITENESS_THRESHOLD = 0.1;                           // used for eliminate some lines
-
-    // Matching lines parameters
-    const double START_END_DISTANCE_THRESHOLD = 85.0;                 // max distance between the start of the first line and the end of the second line
-    const double END_START_DISTANCE_THRESHOLD = 120.0;                // max distance between the end of the first line and the start of the second line
-    const double DELTA_X_THRESHOLD = 20.0;
-    const double DELTA_Y_THRESHOLD = 15.0;
-    const double MAX_PARALLEL_ANGLE = 10.0;                           // max angle to consider two lines as parallel
-
-    // Outliers elimination parameters
-    const std::vector<double> ASPECT_RATIO_THRESHOLDS = {1.4, 1.9};   // minimum aspect ratio for the rotated rects based on the angle of the parking space
-    const int MARGIN = 90;                                            // distance to consider from the edges of a rotated rect
-
-    // Perspective parameters
-    const unsigned short MIN_LENGTH_INCREMENT = 5;
-    const unsigned short MAX_LENGTH_INCREMENT = 20;
-
-    // Other parameters
-    const double RADIUS = 35.5;
-    const float IOU_THRESHOLD = 0.9;
-
-    bool first = true;
-    std::vector<cv::RotatedRect> boundingBoxesCandidates;
-    cv::Size imgSize;
-
-    // For each empty image given, we build the bounding boxes. More empty images, more accurate the final bounding boxes will be
-    for (const auto& iter : std::filesystem::directory_iterator(emptyFramesDir)) {
-        std::string imgPath = iter.path().string();
-
-        // Load the image
-        cv::Mat input = cv::imread(imgPath);
-        if (input.empty()) {
-            throw std::invalid_argument("Error opening the image: Check whether the first argument is the correct path ----> ParkingLot_dataset/sequence0/frames");
-        }
-        imgSize = input.size();
-
-
-        // LSH line detector
-        cv::Mat gray;
-        std::vector<cv::Vec4i> lines;
-        cv::Ptr<cv::LineSegmentDetector> lsd = cv::createLineSegmentDetector(cv::LSD_REFINE_ADV);
-        cvtColor(input, gray, cv::COLOR_BGR2GRAY);
-        lsd->detect(gray, lines);
-
-        // Make the start and end of the lines uniform
-        for (unsigned int i = 0; i < lines.size(); ++i)
-            lines[i] = standardizeLine(lines[i]);
-
-        // Filter the lines
-        std::vector<cv::Vec4i> filteredLines = filterLines(lines, input, PARKING_SPACE_LINES_ANGLES, PROXIMITY_THRESHOLDS,
-                                                           MIN_LINE_LENGTH, ANGLE_THRESHOLD, WHITENESS_THRESHOLD);
-
-        // Match the two best lines for the same parking space together
-        std::vector<std::pair<cv::Vec4i, cv::Vec4i>> matchedLines = matchLines(filteredLines, PARKING_SPACE_LINES_ANGLES,
-                                                                               START_END_DISTANCE_THRESHOLD, END_START_DISTANCE_THRESHOLD,
-                                                                               MAX_PARALLEL_ANGLE, DELTA_X_THRESHOLD, DELTA_Y_THRESHOLD);
-
-        // Build the rotated rects
-        std::vector<cv::RotatedRect> rotatedRects = linesToRotatedRect(matchedLines);
-
-        // Infer missing rects
-        InferRotatedRects(rotatedRects, PARKING_SPACE_ANGLES[1]);
-
-        // Remove rotated rects outliers
-        removeOutliers(rotatedRects, PARKING_SPACE_LINES_ANGLES, imgSize, MARGIN, ASPECT_RATIO_THRESHOLDS);
-
-        boundingBoxesCandidates.insert(boundingBoxesCandidates.end(), rotatedRects.begin(), rotatedRects.end());
-    }
-
-    // See which rotated rects represents the same parking space
-    std::vector<std::vector<cv::RotatedRect>> boundingBoxesParkingSpaces = matchParkingSpaces(boundingBoxesCandidates, RADIUS);
-
-    // For all valid boxes, make the average
-    std::vector<cv::RotatedRect> finalBoundingBoxes = computeAverageRect(boundingBoxesParkingSpaces);
-
-    // Sort the boxes in order to make the labeling consistent
-    std::sort(finalBoundingBoxes.begin(), finalBoundingBoxes.end(),
-              [&](const cv::RotatedRect& rect1, const cv::RotatedRect& rect2) {
-                  cv::Point2f bottomRight1 = getBottomRight(rect1);
-                  cv::Point2f bottomRight2 = getBottomRight(rect2);
-                  return bottomRight1.y > bottomRight2.y;
-              });
-
-
-    // Adjust perspective
-    adjustPerspective(finalBoundingBoxes, imgSize, PARKING_SPACE_ANGLES, MARGIN, MIN_LENGTH_INCREMENT, MAX_LENGTH_INCREMENT);
-
-
-    // Build the bounding boxes
-    unsigned short parkNumber = 1;
-    while (!finalBoundingBoxes.empty() && parkNumber < 38) { // at max there are 37 parking spaces, duplicates are already handled in removeOutliers
-
-        // Find the bounding box with the bottom-right corner with the highest y value
-        auto iterRectHighestBR = std::max_element(finalBoundingBoxes.begin(), finalBoundingBoxes.end(),
-                                                  [this](const cv::RotatedRect &a, const cv::RotatedRect &b) {
-                                                         return getBottomRight(a).y <
-                                                                getBottomRight(b).y;  // Compare the y-values of the bottom-right corners
-                                                     }
-        );
-
-        BoundingBox bbox = BoundingBox(*iterRectHighestBR, parkNumber++);
-        bBoxes.push_back(bbox);
-        finalBoundingBoxes.erase(iterRectHighestBR);
-
-        // Look for the connected/close parking spaces in order to continue the labeling
-        bool foundIntersecting;
-        do {
-            foundIntersecting = false;
-
-            for (auto it = finalBoundingBoxes.begin(); it != finalBoundingBoxes.end(); ++it) {
-                BoundingBox currentBBox(*it, 0);
-
-                // Check if the top-left of the current bounding box intersects with the last bounding box looked (or in case if top-left corner is close to the center)
-                if (isTopLeftInside(bbox, currentBBox) || isWithinRadius(bbox.getTlCorner(), currentBBox.getCenter(), RADIUS+10)) {
-                    BoundingBox newBbox(*it, parkNumber++);
-                    bBoxes.push_back(newBbox);
-                    finalBoundingBoxes.erase(it);
-
-                    // Update the bbox reference to continue checking for intersections from this new box
-                    bbox = newBbox;
-
-                    foundIntersecting = true;  // We found an intersection, so we'll check again in the next loop iteration
-                    break;
-                }
-            }
-        } while (foundIntersecting && parkNumber < 38);
     }
 }

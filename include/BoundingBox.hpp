@@ -1,11 +1,11 @@
 /**
  * @author Alessandro Viespoli 2120824
  */
-
 #ifndef BOUNDINGBOX_HPP
 #define BOUNDINGBOX_HPP
 
 #include <opencv2/imgproc.hpp>
+
 
 class BoundingBox {
 public:
@@ -20,7 +20,7 @@ public:
     BoundingBox(const cv::RotatedRect& rect, const unsigned short& number, const bool& occupied = false);
 
     /**
-     * @brief Update the state of the parking space. If empty becomes occupied, and viceversa.
+     * @brief Update the state of the parking space. If empty then occupied, and viceversa.
      */
     void updateState();
 

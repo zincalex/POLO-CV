@@ -48,15 +48,15 @@ public:
     cv::Mat getSegmentationMaskBinary ();
 
     /**
-     * @return mat containing a binary mask with the results of MOG2 in HSV color space for parking space occupation use
+     * @return mat containing a binary mask with the results of MOG2 in Lab color space for parking space occupation use
      */
-    cv::Mat getMOG2HSVmask();
+    cv::Mat getMOG2Labmask();
 
 private:
     cv::Mat final_mask;
     cv::Mat final_image;
     cv::Mat final_binary_mask;
-    cv::Mat parking_hsv;
+    cv::Mat mog2MaskLab;
 
 
     /**

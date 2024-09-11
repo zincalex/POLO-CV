@@ -165,8 +165,8 @@ cv::Mat Segmentation::getSegmentationMaskBinary() {
     return final_binary_mask;
 }
 
-cv::Mat Segmentation::getMOG2HSVmask() {
-    return parking_hsv;
+cv::Mat Segmentation::getMOG2Labmask() {
+    return mog2MaskLab;
 }
 
 
@@ -186,7 +186,8 @@ int Segmentation::dynamicContoursThresh(const cv::Mat &mask_to_filter) {
 Segmentation::Segmentation(const std::filesystem::path &emptyFramesDir, const std::filesystem::path &mogTrainingDir,const std::vector<BoundingBox>& parkingBBoxes,const std::string& imageName) {
         //parameter loading and definition of needed support matrices
         cv::Mat parking_with_cars_col = cv::imread(imageName);
-        cv::cvtColor(parking_with_cars_col, parking_hsv, cv::COLOR_BGR2Lab);
+        cv::Mat parking_Lab;
+        cv::cvtColor(parking_with_cars_col, parking_Lab, cv::COLOR_BGR2Lab);
         cv::Mat parking_with_cars;
         cv::cvtColor(parking_with_cars_col, parking_with_cars, cv::COLOR_BGR2GRAY);
         cv::Mat src_clean = parking_with_cars_col.clone(); //used only for final mask application
@@ -215,13 +216,13 @@ Segmentation::Segmentation(const std::filesystem::path &emptyFramesDir, const st
 
 
 
-        cv::Mat mog2MaskHSV = getForegroundMaskMOG2(mog2hsv, parking_hsv);
-        mog2MaskHSV = smallContoursElimination(mog2MaskHSV, 300);
+        mog2MaskLab = getForegroundMaskMOG2(mog2hsv, parking_Lab);
+        mog2MaskLab = smallContoursElimination(mog2MaskLab, 300);
         cv::Mat mog2MaskBGR = getForegroundMaskMOG2(mog2bgr, parking_with_cars_col);
         cv::Mat merge;
-        cv::bitwise_or(mog2MaskHSV, mog2MaskBGR, merge);
+        cv::bitwise_or(mog2MaskLab, mog2MaskBGR, merge);
         cv::imshow("BGR", mog2MaskBGR);
-        cv::imshow("HSV", mog2MaskHSV);
+        cv::imshow("HSV", mog2MaskLab);
         //Mog2Mask = smallContoursElimination(bgSubctMask, 100);
 
         //execute background subtraction and use bw& to merge the masks making the mog2 more robust to illumination change

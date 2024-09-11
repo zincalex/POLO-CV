@@ -165,6 +165,11 @@ cv::Mat Segmentation::getSegmentationMaskBinary() {
     return final_binary_mask;
 }
 
+cv::Mat Segmentation::getMOG2HSVmask() {
+    return parking_hsv;
+}
+
+
 int Segmentation::dynamicContoursThresh(const cv::Mat &mask_to_filter) {
     int num_mask_pixels = cv::countNonZero(mask_to_filter);
     int threshold;
@@ -181,7 +186,6 @@ int Segmentation::dynamicContoursThresh(const cv::Mat &mask_to_filter) {
 Segmentation::Segmentation(const std::filesystem::path &emptyFramesDir, const std::filesystem::path &mogTrainingDir,const std::vector<BoundingBox>& parkingBBoxes,const std::string& imageName) {
         //parameter loading and definition of needed support matrices
         cv::Mat parking_with_cars_col = cv::imread(imageName);
-        cv::Mat parking_hsv;
         cv::cvtColor(parking_with_cars_col, parking_hsv, cv::COLOR_BGR2Lab);
         cv::Mat parking_with_cars;
         cv::cvtColor(parking_with_cars_col, parking_with_cars, cv::COLOR_BGR2GRAY);
@@ -241,6 +245,7 @@ Segmentation::Segmentation(const std::filesystem::path &emptyFramesDir, const st
         final_mask = getColorMask(bgSubctMask, parkingSpaceMask);
         final_image = Graphics::maskApplication(src_clean, final_mask);
 }
+
 
 
 

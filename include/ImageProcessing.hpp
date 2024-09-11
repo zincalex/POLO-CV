@@ -11,6 +11,7 @@
 
 class ImageProcessing {
 public:
+
     ImageProcessing() = delete;  // Prevent instantiation, class used as library
 
     /**

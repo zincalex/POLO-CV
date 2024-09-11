@@ -161,36 +161,45 @@ cv::Mat Graphics::drawMap(const std::vector<cv::RotatedRect> &parkingSpaces) {
 void Graphics::fillRotatedRectsWithCar(cv::Mat &empty_map, const std::vector<cv::RotatedRect> &rectangles,
                                        const std::vector<unsigned short> &carIndices) {
 
+    //define constants for better readability, colors read from project handout using gimp
     const cv::Scalar PARKING_OCCUPIED = cv::Scalar(0, 0, 255);
     const cv::Scalar PARKING_BUSY = cv::Scalar(130, 96, 21);
     const cv::Scalar BLACK = cv::Scalar(0, 0, 0);
     const cv::Scalar WHITE = cv::Scalar(255, 255, 255);
+
+    //since it was chosen to ignore the upper row of parking spaces, as allowed in the handout, mark the ignorable spaces in a unique way
     const cv::Scalar NON_CONSIDERED_COLOR = cv::Scalar(127,127,127);
     const std::string NON_CONSIDERED_TEXT = "N/A";
     const int PARKING_NUMBER = 37;
 
+    //scanning through all the generated map rectangles
     for (unsigned int i = 0; i < rectangles.size(); ++i) {
+        //transform in set for better searching of the index
         std::set<int> greenIndexesSet(carIndices.begin(), carIndices.end());
+
+        //get the center position of the current rectangle to label it and create negative offset to improve style since angling the rect creates problems with perspective
         cv::Point label_position = rectangles[i].center;
         label_position.x -=20;
         // If index is found (car parked in the space) rectangle is filled with red or with blue if empty
         cv::Scalar color = (greenIndexesSet.find(i+1) != greenIndexesSet.end()) ? PARKING_OCCUPIED : PARKING_BUSY;
         color = (i > 36) ? NON_CONSIDERED_COLOR : color;
 
+        //get the points to fill the rectangles with the correct color and fill them
         cv::Point2f vertices[4];
         rectangles[i].points(vertices);
         std::vector<cv::Point> points;
-        for (cv::Point2f vertex : vertices) {
+        for (cv::Point2f vertex : vertices)
             points.push_back(vertex);
-        }
-
         std::vector<std::vector<cv::Point>> fillPoints = { points };
         cv::fillPoly(empty_map, fillPoints, color);
-        std::string number = std::to_string(i+1);
 
+        //apply labels to the rectangles, 1 is added to match the numeration of the parking spaces in detection
+        std::string number = std::to_string(i+1);
         if (i < PARKING_NUMBER) {
+            //if the number of the rectangle is within the range of the considered ones then the label with the number is applied
             cv::putText(empty_map, number, label_position, cv::FONT_HERSHEY_SIMPLEX, 1.2, BLACK, 4);
         } else {
+            //if the rectangle is in the ignored ones the "N/A" label is applied, for better readability of the text a further offset is needed
             label_position.x -=15;
             cv::putText(empty_map, NON_CONSIDERED_TEXT, label_position, cv::FONT_HERSHEY_SIMPLEX, 1, BLACK, 4);
         }

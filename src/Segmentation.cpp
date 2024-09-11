@@ -221,8 +221,8 @@ Segmentation::Segmentation(const std::filesystem::path &emptyFramesDir, const st
         cv::Mat mog2MaskBGR = getForegroundMaskMOG2(mog2bgr, parking_with_cars_col);
         cv::Mat merge;
         cv::bitwise_or(mog2MaskLab, mog2MaskBGR, merge);
-        cv::imshow("BGR", mog2MaskBGR);
-        cv::imshow("HSV", mog2MaskLab);
+        //cv::imshow("BGR", mog2MaskBGR);
+        //cv::imshow("HSV", mog2MaskLab);
         //Mog2Mask = smallContoursElimination(bgSubctMask, 100);
 
         //execute background subtraction and use bw& to merge the masks making the mog2 more robust to illumination change

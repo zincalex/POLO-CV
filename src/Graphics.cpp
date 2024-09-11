@@ -4,15 +4,56 @@
 
 #include "../include/Graphics.hpp"
 
-void Graphics::getParkingRow(std::vector<cv::RotatedRect> &parkingSlots, int numParking, float angle, int xOffset,
+
+void Graphics::applyMap(cv::Mat& src, const std::vector<unsigned short> &occupiedParkingSpaces) {
+    // Get the rectangles that represent the map configuration
+    std::vector<cv::RotatedRect> rectangles = Graphics::getBoxesForMap();
+    cv::Mat mapImage = drawMap(rectangles);
+
+    // Color the boxes accordingly
+    fillRotatedRectsWithCar(mapImage, rectangles, occupiedParkingSpaces);
+
+    // Apply the map on the image
+    Graphics::mapOverlay(src, mapImage);
+}
+
+
+void Graphics::drawRotatedRects(cv::Mat& image, const std::vector<cv::RotatedRect>& rotatedRects) {
+    cv::Scalar redColor(0, 0, 255);
+
+    for (const cv::RotatedRect& rect : rotatedRects) {
+        // Get the 4 vertices of the rotated rectangle
+        cv::Point2f vertices[4];
+        rect.points(vertices);
+
+        // Convert the vertices to integer points
+        std::vector<cv::Point> intVertices(4);
+        for (int i = 0; i < 4; i++) {
+            intVertices[i] = vertices[i];
+        }
+
+        cv::polylines(image, intVertices, true, redColor, 2);  // Thickness of 2
+    }
+}
+
+
+cv::Mat Graphics::maskApplication(cv::Mat &target, const cv::Mat &mask) {
+    cv::Mat masked_image = target.clone();
+    addWeighted(mask, 1, masked_image, 0.5, 0, masked_image);
+    return masked_image;
+}
+
+
+void Graphics::createParkingRow(std::vector<cv::RotatedRect> &parkingSlots, int numParking, float angle, int xOffset,
                              float horizontalOffsetAdjustment, int yOffset, float verticalOffsetAdjustment,
                              int parkingWidth, int parkingHeight, int spacing, int extraSpacing, bool isDoubleRow,
                              bool isLowerSet) {
+
     float radianAngle = angle * CV_PI / 180.0;
     float verticalOffset = parkingWidth * std::sin(radianAngle);
 
     //Work with distinct parking space sets to manage different position, angle and size
-    for (int i = 0; i < numParking; ++i) {
+    for (unsigned int i = 0; i < numParking; ++i) {
         if (isDoubleRow) {
             if (!isLowerSet) {
                 // upper part of parking space set with two rows
@@ -25,7 +66,7 @@ void Graphics::getParkingRow(std::vector<cv::RotatedRect> &parkingSlots, int num
                 // lower part of parking space set with two rows
                 cv::Point2f centerRight(xOffset + i * (parkingWidth + spacing+extraSpacing) + horizontalOffsetAdjustment, yOffset + parkingHeight - verticalOffset + verticalOffsetAdjustment);
                 cv::Size2f size(parkingWidth, parkingHeight);
-                cv::RotatedRect rotatedRectRight(centerRight, size, -angle);  // Angolo opposto per la parte inferiore
+                cv::RotatedRect rotatedRectRight(centerRight, size, -angle);  // Opposite angle for the inferior part
                 parkingSlots.push_back(rotatedRectRight);
             }
         } else {
@@ -39,10 +80,10 @@ void Graphics::getParkingRow(std::vector<cv::RotatedRect> &parkingSlots, int num
 }
 
 
-std::vector<cv::RotatedRect> Graphics::getBoxes() {
+std::vector<cv::RotatedRect> Graphics::getBoxesForMap() {
     std::vector<cv::RotatedRect> rectangles;
 
-    // define parking slots properties
+    // Define parking slots properties
     int parkingWidth = 60;
     int parkingHeight = 120;
     int spacing = 20;
@@ -55,7 +96,8 @@ std::vector<cv::RotatedRect> Graphics::getBoxes() {
     float verticalOffsetAdjustment = 0;
     float angleTop = -30.0f;
 
-    getParkingRow(rectangles, numParkingTop, angleTop, xOffsetTop, horizontalOffsetAdjustment, yOffsetTop, verticalOffsetAdjustment,parkingWidth, parkingHeight, spacing, 0);
+    createParkingRow(rectangles, numParkingTop, angleTop, xOffsetTop, horizontalOffsetAdjustment,
+                     yOffsetTop, verticalOffsetAdjustment,parkingWidth, parkingHeight, spacing, 0);
 
     // Section 2: (center set, double row of parking spaces with different angles, special parameters are used to handle the more extreme inclination)
     int yOffsetMiddle = yOffsetTop + parkingHeight + 60;
@@ -66,11 +108,13 @@ std::vector<cv::RotatedRect> Graphics::getBoxes() {
     float angleMiddleBottom = -45.0f;
     horizontalOffsetAdjustment = -45;
     verticalOffsetAdjustment = 20;
-    // Draw upper row of center set
-    getParkingRow(rectangles, numParkingMiddleTop, angleMiddleTop, xOffsetMiddle, horizontalOffsetAdjustment,yOffsetMiddle, verticalOffsetAdjustment,parkingWidth, parkingHeight, spacing,20,true, false);
 
+    // Draw upper row of center set
+    createParkingRow(rectangles, numParkingMiddleTop, angleMiddleTop, xOffsetMiddle, horizontalOffsetAdjustment,
+                     yOffsetMiddle, verticalOffsetAdjustment,parkingWidth, parkingHeight, spacing,20,true, false);
     // Draw lower row of center set
-    getParkingRow(rectangles, numParkingMiddleBottom, -angleMiddleBottom, xOffsetMiddle, horizontalOffsetAdjustment,yOffsetMiddle, verticalOffsetAdjustment,parkingWidth, parkingHeight, spacing, 20,true, true);
+    createParkingRow(rectangles, numParkingMiddleBottom, -angleMiddleBottom, xOffsetMiddle, horizontalOffsetAdjustment,
+                     yOffsetMiddle, verticalOffsetAdjustment,parkingWidth, parkingHeight, spacing, 20,true, true);
 
     // Section 3: (lower set, double row of parking spaces)
     int yOffsetBottom = yOffsetMiddle + parkingHeight * 2 + 50;
@@ -81,31 +125,34 @@ std::vector<cv::RotatedRect> Graphics::getBoxes() {
     horizontalOffsetAdjustment = 15;
     verticalOffsetAdjustment = -35;
 
-    getParkingRow(rectangles, numParkingBottom, angleBottom, xOffsetBottom, horizontalOffsetAdjustment, yOffsetBottom, verticalOffsetAdjustment,parkingWidth, parkingHeight, spacing, 0,true);
+    createParkingRow(rectangles, numParkingBottom, angleBottom, xOffsetBottom, horizontalOffsetAdjustment, yOffsetBottom,
+                     verticalOffsetAdjustment,parkingWidth, parkingHeight, spacing, 0,true);
 
-    getParkingRow(rectangles, numParkingBottom, -angleBottom, xOffsetBottom, horizontalOffsetAdjustment,yOffsetBottom, verticalOffsetAdjustment,parkingWidth, parkingHeight, spacing, 0,true, true);
+    createParkingRow(rectangles, numParkingBottom, -angleBottom, xOffsetBottom, horizontalOffsetAdjustment,yOffsetBottom,
+                     verticalOffsetAdjustment,parkingWidth, parkingHeight, spacing, 0,true, true);
 
-    //vector with rectangles is reversed to match with how the parking space detector works
+    // Vector with rectangles is reversed to match with how the parking space detector works
     std::reverse(rectangles.begin(), rectangles.end());
+
     return rectangles;
 }
 
 
 cv::Mat Graphics::drawMap(const std::vector<cv::RotatedRect> &parkingSpaces) {
-    //define dimensions of original map
+    // Define dimensions of original map
     int width = 950;
     int height = 750;
 
     cv::Mat parkingMap(height, width, CV_8UC3, cv::Scalar(255, 255, 255));
 
-    for (const auto & parkingSpace : parkingSpaces) {
+    for (const cv::RotatedRect& parkingSpace : parkingSpaces) {
         cv::Point2f vertices[4];
         parkingSpace.points(vertices);
 
-        for (int i = 0; i < 4; i++) {
+        for (unsigned int i = 0; i < 4; ++i)
             cv::line(parkingMap, vertices[i], vertices[(i + 1) % 4], cv::Scalar(51, 36, 4), 20);
-        }
     }
+
     return parkingMap;
 }
 
@@ -121,18 +168,18 @@ void Graphics::fillRotatedRectsWithCar(cv::Mat &empty_map, const std::vector<cv:
     const std::string NON_CONSIDERED_TEXT = "N/A";
     const int PARKING_NUMBER = 37;
 
-    for (size_t i = 0; i < rectangles.size(); ++i) {
+    for (unsigned int i = 0; i < rectangles.size(); ++i) {
         std::set<int> greenIndexesSet(carIndices.begin(), carIndices.end());
         cv::Point label_position = rectangles[i].center;
         label_position.x -=20;
         // If index is found (car parked in the space) rectangle is filled with red or with blue if empty
         cv::Scalar color = (greenIndexesSet.find(i+1) != greenIndexesSet.end()) ? PARKING_OCCUPIED : PARKING_BUSY;
         color = (i > 36) ? NON_CONSIDERED_COLOR : color;
+
         cv::Point2f vertices[4];
         rectangles[i].points(vertices);
-
         std::vector<cv::Point> points;
-        for (auto vertex : vertices) {
+        for (cv::Point2f vertex : vertices) {
             points.push_back(vertex);
         }
 
@@ -142,7 +189,7 @@ void Graphics::fillRotatedRectsWithCar(cv::Mat &empty_map, const std::vector<cv:
 
         if (i < PARKING_NUMBER) {
             cv::putText(empty_map, number, label_position, cv::FONT_HERSHEY_SIMPLEX, 1.2, BLACK, 4);
-        }else{
+        } else {
             label_position.x -=15;
             cv::putText(empty_map, NON_CONSIDERED_TEXT, label_position, cv::FONT_HERSHEY_SIMPLEX, 1, BLACK, 4);
         }
@@ -167,36 +214,8 @@ void Graphics::mapOverlay(cv::Mat &src, const cv::Mat& map) {
 
 
 
-void Graphics::drawRotatedRects(cv::Mat& image, const std::vector<cv::RotatedRect>& rotatedRects) {
-    cv::Scalar redColor(0, 0, 255);
-
-    for (const cv::RotatedRect& rect : rotatedRects) {
-        // Get the 4 vertices of the rotated rectangle
-        cv::Point2f vertices[4];
-        rect.points(vertices);
-
-        // Convert the vertices to integer points
-        std::vector<cv::Point> intVertices(4);
-        for (int i = 0; i < 4; i++) {
-            intVertices[i] = vertices[i];
-        }
-
-        cv::polylines(image, intVertices, true, redColor, 2);  // Thickness of 2
-    }
-}
 
 
-void Graphics::applyMap(const std::string &imageName, const std::vector<unsigned short> &occupiedParkingSpaces) {
-    cv::Mat src = cv::imread(imageName);
-    std::vector<cv::RotatedRect> rectangles = getBoxes();
-    cv::Mat mapImage = drawMap(rectangles);
-    fillRotatedRectsWithCar(mapImage, rectangles, occupiedParkingSpaces);
-    mapOverlay(src, mapImage);
-    cv::imshow("2DMap", src);
-}
 
-cv::Mat Graphics::maskApplication(cv::Mat &target, const cv::Mat &mask) {
-    cv::Mat masked_image = target.clone();
-    addWeighted(mask, 1, masked_image, 0.5, 0, masked_image);
-    return masked_image;
-}
+
+

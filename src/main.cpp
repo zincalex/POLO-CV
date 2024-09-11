@@ -90,14 +90,16 @@ int main(int argc, char** argv) {
 
 
         // Metrics
-        //Metrics metrics = Metrics(groundTruth.getBBoxes(), parkingStatus.getStatusPredictions(), segmentationGTMask, seg.getSegmentationMaskWithClasses());
-        //std::cout << "mAP: " << metrics.calculateMeanAveragePrecisionParkingSpaceLocalization() << std::endl;
-        //std::cout << "mIoU: " << metrics.calculateMeanIntersectionOverUnionSegmentation() << std::endl;
-        //cv::waitKey(0);
+        Metrics metrics = Metrics(groundTruth.getBBoxes(), parkingStatus.getStatusPredictions(), segmentationGTMask, seg.getSegmentationMaskWithClasses());
+        std::cout << "mAP: " << metrics.calculateMeanAveragePrecisionParkingSpaceLocalization() << std::endl;
+        std::cout << "mIoU: " << metrics.calculateMeanIntersectionOverUnionSegmentation() << std::endl;
+        cv::waitKey(0);
 
         // 2D Map
-        //Graphics::applyMap(imgPath, parkingStatus.getOccupiedParkingSpaces());
-
+        cv::Mat clone = parkingImg.clone();
+        Graphics::applyMap(clone, parkingStatus.getOccupiedParkingSpaces());
+        cv::imshow("2DMap", clone);
+        cv::waitKey(0);
 
     }
 

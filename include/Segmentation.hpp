@@ -80,23 +80,14 @@ private:
     cv::Mat getForegroundMaskMOG2(cv::Ptr<cv::BackgroundSubtractorMOG2>& mog2, cv::Mat& busy_parking);
 
     /**
-     * @brief Calculates the average of the sequence0 images, used in background elimination to improve generalization performance.
+     * @brief Gets the busy parking image, confronts it with all images in training set and finds the one with smallest difference, using it to create a binary mask that identifies only the changing parts of the image.
      *
-     * @param emptyFramesDir path to the sequence0 frames
+     * @param emptyFramesDir directory of the training dataset
+     * @param busy_parking mat containing the image to process
      *
-     * @return mat containing the average of the grayscale images in the folder
+     * @return mat containing a binary mask of the changing elements
      */
-    cv::Mat averageEmptyImages(const std::filesystem::path& emptyFramesDir);
-
-    /**
-     * @brief Creates the background elimination mask coming from the averaged empty parking images using absolute difference and thresholding.
-     *
-     * @param empty_parking mat containing an empty parking picture to use as background
-     * @param busy_parking mat containing an busy parking picture to use a target
-     *
-     * @return mat containing a binary mask obtained from background elimination
-     */
-    cv::Mat backgroundSubtractionMask(const cv::Mat& empty_parking, const cv::Mat& busy_parking);
+    cv::Mat backgroundSubtractionWithBestMatch(const std::filesystem::path &emptyFramesDir, const cv::Mat &busy_parking);
 
     /**
      * @brief Eliminates elements smaller than a defined area to eliminate noise.
@@ -107,6 +98,8 @@ private:
      * @return mat containing mask cleaned from noise
      */
     cv::Mat smallContoursElimination(const cv::Mat& input_mask, const int&minArea);
+
+
 
     /**
      * @brief Generates a binary mask marking the detected parking spaces, used to determine if a segmented car is parked or roaming.
@@ -127,8 +120,6 @@ private:
      * @return mat containing a mask with black as background, red as car in parking slot and green as roaming car
      */
     cv::Mat getColorMask(const cv::Mat& car_fgMask, const cv::Mat& parking_mask);
-
-    int dynamicContoursThresh(const cv::Mat& mask_to_filter);
 };
 
 

@@ -5,38 +5,41 @@
 #include "../include/Segmentation.hpp"
 
 
-cv::Mat Segmentation::averageEmptyImages(const std::filesystem::path &emptyFramesDir) {
+cv::Mat Segmentation::backgroundSubtractionWithBestMatch(const std::filesystem::path &emptyFramesDir, const cv::Mat &busy_parking) {
     std::vector<cv::Mat> empty_images;
+    cv::Mat best_empty_image;
+    double min_diff = DBL_MAX;  // Max double value, used to find the minimum
+
+
     for (const auto &iter: std::filesystem::directory_iterator(emptyFramesDir)) {
         std::string imgPath = iter.path().string();
-        cv::Mat input = cv::imread(imgPath, cv::IMREAD_GRAYSCALE);
-        empty_images.push_back(input);
-    }//loads all images from sequence 0 in vector
-    cv::Mat empty_parking = cv::Mat::zeros(empty_images[0].size(), CV_32FC1);
-    for (const auto &img: empty_images) {
-        cv::Mat temp;
-        img.convertTo(temp, CV_32FC1);
-        empty_parking += temp;
-    }//sum all the images in a float matrix so the mean can be more precise and is not bound by unsigned char
-    empty_parking /= empty_images.size();
-    //calculate mean
+        cv::Mat empty_image = cv::imread(imgPath, cv::IMREAD_GRAYSCALE);
+        if (empty_image.empty()) {
+            std::cerr << "Error loading image: " << imgPath << std::endl;
+            continue;
+        }
 
-    empty_parking.convertTo(empty_parking, CV_8UC1);
-    return empty_parking;
-}
+        // Absdiff between current image and all dataset images
+        cv::Mat diff;
+        cv::absdiff(busy_parking, empty_image, diff);
 
-cv::Mat Segmentation::backgroundSubtractionMask(const cv::Mat &empty_parking, const cv::Mat &busy_parking) {
+        // sum abs values to get the total difference
+        double diff_sum = cv::sum(diff)[0];
+
+        // Find and update the best image
+        if (diff_sum < min_diff) {
+            min_diff = diff_sum;
+            best_empty_image = empty_image.clone();
+        }
+    }
+
+    // Use best match for bgelimination
     cv::Mat diff;
-    cv::absdiff(busy_parking, empty_parking, diff); //used absdiff to avoid possible negative numbers
-    cv::Mat bg1_mask;
-    cv::threshold(diff, bg1_mask, 60, 255, cv::THRESH_BINARY);
-    //use tresholding to get the mask
+    cv::absdiff(busy_parking, best_empty_image, diff);
 
-    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(20, 20));
-    cv::morphologyEx(bg1_mask, bg1_mask, cv::MORPH_DILATE, kernel);
-    //cv::morphologyEx(bg1_mask, bg1_mask, cv::MORPH_CLOSE, kernel);
-    //use a huge morphological operation, in this case this mask only removes a bigger portion of the background to help mog2
-    //cv::imshow("bgelim", bg1_mask);
+    cv::Mat bg1_mask;
+    cv::threshold(diff, bg1_mask, 1, 255, cv::THRESH_BINARY);
+
     return bg1_mask;
 }
 
@@ -56,6 +59,7 @@ cv::Mat Segmentation::smallContoursElimination(const cv::Mat& input_mask, const 
     }
     return in_mask;
 }
+
 
 cv::Ptr<cv::BackgroundSubtractorMOG2> Segmentation::trainBackgroundModel(const std::vector<cv::String> &backgroundImages, const int &color_conversion_code) {
     //check for mog2 dataset - mandatory for the segmentation, in c++ no possibile way of saving an already trained mog2 bg remover
@@ -170,16 +174,7 @@ cv::Mat Segmentation::getMOG2Labmask() {
 }
 
 
-int Segmentation::dynamicContoursThresh(const cv::Mat &mask_to_filter) {
-    int num_mask_pixels = cv::countNonZero(mask_to_filter);
-    int threshold;
-    if (num_mask_pixels < 50000){
-        threshold = 1500;
-    } else {
-        threshold = 300;
-    }
-    return  threshold;
-}
+
 
 
 
@@ -217,89 +212,75 @@ Segmentation::Segmentation(const std::filesystem::path &emptyFramesDir, const st
         cv::glob(mogTrainingDir, backgroundImages);
         mog2hsv = trainBackgroundModel(backgroundImages, cv::COLOR_BGR2Lab);
         mog2bgr = trainBackgroundModel(backgroundImages);
-        empty_parking = averageEmptyImages(mogTrainingDir);
         trained = true;
         std::cout << "READY - Training finished" << std::endl;
     }
 
 
-    inRange(parking_HSV, cv::Scalar(0, 75, 0), cv::Scalar(179, 255, 255), hsvMask);
-    inRange(parking_Lab, cv::Scalar(0, 140, 0), cv::Scalar(255, 255, 255), labMask);
+    inRange(parking_HSV, cv::Scalar(0, 75, 0), cv::Scalar(179, 255, 255), hsvMask); //picks up ony saturation between 75 and 255, full scan on the other channels
+    inRange(parking_Lab, cv::Scalar(0, 140, 0), cv::Scalar(255, 255, 255), labMask); //used to pick red cars with higher part of A channel
+
     labMask = smallContoursElimination(labMask, 300);
-    cv::bitwise_not(hsvMask,hsvMask);
-    //cv::imshow("HSVMASK", hsvMask);
-    //cv::imshow("LABMASK", labMask);
+    cv::bitwise_not(hsvMask,hsvMask);//used as segmentation black ROI
+
     mog2MaskLab = getForegroundMaskMOG2(mog2hsv, parking_Lab);
-    //cv::imshow("LAB_PRE", mog2MaskLab);
-    cv::bitwise_and(hsvMask, mog2MaskLab, mog2MaskLab);
-    cv::bitwise_or(labMask, mog2MaskLab, mog2MaskLab);
-    cv::imshow("LAB_POST", mog2MaskLab);
+
+    cv::bitwise_and(hsvMask, mog2MaskLab, mog2MaskLab); //remove S from mask
+    cv::bitwise_or(labMask, mog2MaskLab, mog2MaskLab); //add red cars removed by saturation elimination
+
     cv::morphologyEx(mog2MaskLab, mog2MaskLab , cv::MORPH_CLOSE, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(8, 8)));
     cv::morphologyEx(mog2MaskLab, mog2MaskLab , cv::MORPH_OPEN, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 3)));
-    //cv::morphologyEx(mog2MaskLab, mog2MaskLab , cv::MORPH_OPEN, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(40, 1)));
+
+
     std::vector<std::vector<cv::Point>> contours;
     std::vector<cv::Vec4i> hierarchy;
     cv::findContours(mog2MaskLab, contours, hierarchy, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
     // filter contours by size deleting the ones smaller than the area defined in the method call, reduces noise in the mask without using morphologicals
     for (size_t i = 0; i < contours.size(); i++) {
-            cv::drawContours(mog2MaskLab, contours, static_cast<int>(i), cv::Scalar(255), cv::FILLED);
+        cv::drawContours(mog2MaskLab, contours, static_cast<int>(i), cv::Scalar(255), cv::FILLED);
     }
 
     mog2MaskLab = smallContoursElimination(mog2MaskLab, 550);
-    cv::imshow("LAB_POSTPOSTPOST", mog2MaskLab);
+
     cv::Mat mog2MaskBGR = getForegroundMaskMOG2(mog2bgr, parking_with_cars_col);
-    cv::bitwise_and(hsvMask, mog2MaskBGR, mog2MaskBGR);
-    cv::bitwise_or(labMask, mog2MaskBGR, mog2MaskBGR);
-    //cv::imshow("BGR_PRE", mog2MaskBGR);
-    //mog2MaskBGR = smallContoursElimination(mog2MaskBGR, 50);
-    cv::imshow("BGR_Post", mog2MaskBGR);
-    //mog2MaskBGR = smallContoursElimination(mog2MaskBGR, 300);
+
+    cv::bitwise_and(hsvMask, mog2MaskBGR, mog2MaskBGR); //same as before, remove S
+    cv::bitwise_or(labMask, mog2MaskBGR, mog2MaskBGR);  //red cars are restored
+
     cv::morphologyEx(mog2MaskLab, mog2MaskLab , cv::MORPH_DILATE, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 6)));
     cv::morphologyEx(mog2MaskBGR, mog2MaskBGR, cv::MORPH_DILATE, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 6)));
-    cv::imshow("Final_BGR", mog2MaskBGR);
-    cv::imshow("Final_LAB", mog2MaskLab);
 
-    //cv::morphologyEx(mog2MaskBGR, mog2MaskBGR, cv::MORPH_CLOSE, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 6)));
-    //cv::morphologyEx(mog2MaskLab, mog2MaskLab, cv::MORPH_DILATE, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3, 6)));
     cv::Mat merge;
     cv::bitwise_and(mog2MaskLab, mog2MaskBGR, merge);
-    mog2MaskBGR = smallContoursElimination(mog2MaskBGR, 300);
-    //cv::imshow("BGR", mog2MaskBGR);
-    //cv::imshow("Lab", mog2MaskLab);
-    //Mog2Mask = smallContoursElimination(bgSubctMask, 100);
+
 
     //execute background subtraction and use bw& to merge the masks making the mog2 more robust to illumination change
-    bgElimMask = backgroundSubtractionMask(empty_parking, parking_with_cars);
-    //cv::imshow("bgelim", bgElimMask);
-    //cv::imshow("mog2", Mog2Mask);
-    //cv::bitwise_and(bgElimMask, merge, bgSubctMask);
-    //bgSubctMask = Mog2Mask.clone();
+    bgElimMask = backgroundSubtractionWithBestMatch(mogTrainingDir, parking_with_cars);
+    cv::bitwise_and(bgElimMask, merge, bgElimMask);
+    cv::bitwise_or(bgElimMask, labMask, bgElimMask);
+
+    cv::Mat final_segmentation_mask = bgElimMask.clone();
+
 
     //final mask refinement
-    //morphological to clean the final masks as best as possible
-    //cv::morphologyEx(bgSubctMask, bgSubctMask, cv::MORPH_ERODE, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(4, 4)));
 
-    //removes the small noise
-    int small_contour = dynamicContoursThresh(bgSubctMask);
-    merge = smallContoursElimination(merge, 1200);
-    //std::cout << cv::countNonZero(bgSubctMask) << std::endl; //300k+
-    cv::morphologyEx(merge, merge, cv::MORPH_CLOSE, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5)));
-    cv::findContours(merge, contours, hierarchy, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+    final_segmentation_mask = smallContoursElimination(final_segmentation_mask, 1200);
+    cv::morphologyEx(final_segmentation_mask, final_segmentation_mask, cv::MORPH_CLOSE, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(9, 9)));
 
     // filter contours by size deleting the ones smaller than the area defined in the method call, reduces noise in the mask without using morphologicals
+    cv::findContours(final_segmentation_mask, contours, hierarchy, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
     for (size_t i = 0; i < contours.size(); i++) {
-        cv::drawContours(merge , contours, static_cast<int>(i), cv::Scalar(255), cv::FILLED);
+        cv::drawContours(final_segmentation_mask , contours, static_cast<int>(i), cv::Scalar(255), cv::FILLED);
     }
 
     //remove cars and noise from the optional area
-    cv::Mat black_roi_segmentation = ImageProcessing::optionalAreaROI(merge.size());
+    cv::Mat black_roi_segmentation = ImageProcessing::optionalAreaROI(final_segmentation_mask.size());
     cv::bitwise_not(black_roi_segmentation, black_roi_segmentation);
-    cv::bitwise_and(black_roi_segmentation, merge, merge);
-    cv::imshow("test", black_roi_segmentation);
+    cv::bitwise_and(black_roi_segmentation, final_segmentation_mask, final_segmentation_mask);
 
     //assign variables for access
-    final_binary_mask = merge.clone();
-    final_mask = getColorMask(merge, parkingSpaceMask);
+    final_binary_mask = final_segmentation_mask.clone();
+    final_mask = getColorMask(final_segmentation_mask, parkingSpaceMask);
     final_image = Graphics::maskApplication(src_clean, final_mask);
 }

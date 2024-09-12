@@ -155,6 +155,7 @@ double Metrics::calculateIoUSegmentation(const cv::Mat& groundTruthMask, const c
 
     // Adjust ground truth for the optional area
     groundTruthClass = groundTruthClass & optionalAreaMask;
+    predictedClass = predictedClass & optionalAreaMask;
 
     // Calculate intersection and union
     cv::Mat intersectionMask = groundTruthClass & predictedClass;

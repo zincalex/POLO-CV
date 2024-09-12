@@ -118,12 +118,10 @@ cv::Mat Segmentation::getBBoxMask(const std::vector<BoundingBox> &parkingBBoxes,
     for (const auto& bbox : parkingBBoxes) {
         extractedRects.push_back(bbox.getRotatedRect());
     }
-    //classifies the optional area as parking spaces since it is ignored in the parkingspacedetector as per project specifications
-    cv::Mat optionalArea = ImageProcessing::optionalAreaROI(target.size());
     cv::Mat rectsMask = ImageProcessing::createRectsMask(extractedRects, target.size());
 
-    //returns merged masks with three white ROIs where the parking slots are
-    return optionalArea | rectsMask;
+
+    return rectsMask;
 }
 
 cv::Mat Segmentation::getColorMask(const cv::Mat &car_fgMask, const cv::Mat & parking_mask) {
@@ -293,6 +291,12 @@ Segmentation::Segmentation(const std::filesystem::path &emptyFramesDir, const st
     for (size_t i = 0; i < contours.size(); i++) {
         cv::drawContours(merge , contours, static_cast<int>(i), cv::Scalar(255), cv::FILLED);
     }
+
+    //remove cars and noise from the optional area
+    cv::Mat black_roi_segmentation = ImageProcessing::optionalAreaROI(merge.size());
+    cv::bitwise_not(black_roi_segmentation, black_roi_segmentation);
+    cv::bitwise_and(black_roi_segmentation, merge, merge);
+    cv::imshow("test", black_roi_segmentation);
 
     //assign variables for access
     final_binary_mask = merge.clone();

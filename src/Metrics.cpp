@@ -9,6 +9,12 @@ Metrics::Metrics(const std::vector<BoundingBox>& groundTruth, const std::vector<
     this->bBoxesPrediction = bBoxesPrediction;
     this->trueSegmentationMask = trueSegmentationMask;
     this->segmentationColorMask = segmentationColorMask;
+
+    // Building the optinal area mask
+    cv::Size imgSize = segmentationColorMask.size();
+    cv::Mat mask;
+    mask = ImageProcessing::optionalAreaROI(imgSize);
+    cv::bitwise_not(mask, this->optionalAreaMask);
 }
 
 
@@ -146,6 +152,9 @@ double Metrics::calculateIoUSegmentation(const cv::Mat& groundTruthMask, const c
     //   - 2 -> car outside parking space
     cv::Mat groundTruthClass = (groundTruthMask == classId); // 255 where there is a match
     cv::Mat predictedClass = (predictedMask == classId);
+
+    // Adjust ground truth for the optional area
+    groundTruthClass = groundTruthClass & optionalAreaMask;
 
     // Calculate intersection and union
     cv::Mat intersectionMask = groundTruthClass & predictedClass;

@@ -7,7 +7,7 @@ cv::Mat ImageProcessing::optionalAreaROI(const cv::Size& imgSize) {
     cv::Mat mask = cv::Mat::zeros(imgSize, CV_8UC1);
 
     // Define ROI that select the third high row of parking spaces
-    cv:: RotatedRect roiRect = cv::RotatedRect(cv::Point(1084, 83), cv::Size(452, 54), 28);
+    cv:: RotatedRect roiRect = cv::RotatedRect(cv::Point(1200, 50), cv::Size(700, 225), 28);
 
     cv::Point2f vertices[4];
     std::vector<cv::Point> contour;

@@ -49,6 +49,8 @@ private:
     std::vector<BoundingBox> bBoxesPrediction;
     cv::Mat trueSegmentationMask;
     cv::Mat segmentationColorMask;
+    cv::Mat optionalAreaMask;              // Used for modifying the ground truth for segmentation
+
 
     /**
      * @brief Calculates the Intersection over Union (IoU) between two rotated rotated rects coming from the BoundingBox object.

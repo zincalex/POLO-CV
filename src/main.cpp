@@ -87,7 +87,7 @@ int main(int argc, char** argv) {
         // Metrics
         Metrics metrics = Metrics(groundTruth.getBBoxes(), parkingStatus.getStatusPredictions(), segmentationGTMask, seg.getSegmentationMaskWithClasses());
 
-        // 2D Map
+        // 2D Map 
         cv::Mat clone = parkingImg.clone();
         Graphics::applyMap(clone, parkingStatus.getOccupiedParkingSpaces());
 

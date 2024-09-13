@@ -21,7 +21,7 @@ ParkingLotStatus::ParkingLotStatus(const cv::Mat& parkingImage, std::vector<Boun
 
         // SEGMENTATION MASK CHECK
         int totalPixels = boxedInputImg.rows * boxedInputImg.cols;
-        if(isCar(hsvBoxedSegMask, totalPixels, 20.0)) {  // 20% of the pixels must be white in order to be a car
+        if(isCar(hsvBoxedSegMask, totalPixels, 26)) {  // 26% of the pixels must be white in order to be a car
             bBox.updateState();
             continue;  // next bounding box
         }

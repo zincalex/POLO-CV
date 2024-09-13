@@ -14,7 +14,6 @@ cv::Mat ImageProcessing::optionalAreaROI(const cv::Size& imgSize) {
     roiRect.points(vertices);
     for (const cv::Point2f& vertex : vertices) { contour.push_back(vertex); }
     cv::fillConvexPoly(mask, contour, cv::Scalar(255));
-
     return mask;
 }
 

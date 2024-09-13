@@ -1,3 +1,0 @@
-----------------     METRICS     ----------------
-Parking space localization  ----> mAP  = 0.793103
-Car segmentation            ----> mIoU = 0.862439

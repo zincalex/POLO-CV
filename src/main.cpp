@@ -1,7 +1,6 @@
 /**
  * @author Alessandro Viespoli 2120824
  */
-
 #include <iostream>
 #include <filesystem>
 #include <opencv4/opencv2/imgcodecs.hpp>
@@ -28,7 +27,6 @@ int main(int argc, char** argv) {
         std::cerr << "Usage: <sequence0_frames_directory> <sequence_directory>" << std::endl;
         return -1;
     }
-
 
     // Directories paths
     // Parking space localization paths
@@ -78,11 +76,11 @@ int main(int argc, char** argv) {
         cv::Mat segmentationGTMask = cv::imread(groundTruthMaskPath); //BGR image
 
         // Segmentation
-        Segmentation seg = Segmentation(pathSequence0FramesDir, trainingDir ,bBoxes,imgPath);
+        Segmentation seg = Segmentation(trainingDir ,bBoxes,imgPath);
 
         // Car detection
         cv::Mat parkingImg = cv::imread(imgPath);
-        ParkingLotStatus parkingStatus = ParkingLotStatus(parkingImg, bBoxes, seg.getMOG2Labmask());
+        ParkingLotStatus parkingStatus = ParkingLotStatus(parkingImg, bBoxes, seg.getSegmentationMaskBinary());
 
         // Metrics
         Metrics metrics = Metrics(groundTruth.getBBoxes(), parkingStatus.getStatusPredictions(), segmentationGTMask, seg.getSegmentationMaskWithClasses());
@@ -92,7 +90,7 @@ int main(int argc, char** argv) {
         Graphics::applyMap(clone, parkingStatus.getOccupiedParkingSpaces());
 
         // Show results
-        std::cout << "\n Working on image " << filenameExtension  << " for the " << framePath << std::endl;
+        std::cout << "\n Working on image " << filenameExtension  << "  in  " << framePath << std::endl;
         cv::imshow("Predicted parking lot status", parkingStatus.seeParkingLotStatus());
         cv::waitKey(0);
         cv::imshow("Segmentation", seg.getSegmentationResult());
@@ -101,9 +99,10 @@ int main(int argc, char** argv) {
         std::cout << "Parking space localization  ----> mAP  = " << metrics.calculateMeanAveragePrecisionParkingSpaceLocalization() << std::endl;
         std::cout << "Car segmentation            ----> mIoU = " << metrics.calculateMeanIntersectionOverUnionSegmentation() << std::endl;
         cv::waitKey(0);
-        cv::imshow("2DMap", clone);
+        cv::imshow("2D Map", clone);
         cv::waitKey(0);
         cv::destroyAllWindows();
     }
+    
     return 0;
 }

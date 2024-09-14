@@ -59,10 +59,8 @@ int main(int argc, char** argv) {
     ParkingSpaceDetector psDetector = ParkingSpaceDetector(pathSequence0FramesDir);
     std::vector<BoundingBox> bBoxes = psDetector.getBBoxes();
 
-
     // CLASSIFICATION & SEGMENTATION
     for (const auto& iter : std::filesystem::directory_iterator(pathSequenceFramesDir)) { // For each image
-
         // More paths
         std::string imgPath = iter.path().string();
         std::string filenameWithoutExtension = iter.path().stem().string(); // Removes the ".png"
@@ -85,7 +83,7 @@ int main(int argc, char** argv) {
         // Metrics
         Metrics metrics = Metrics(groundTruth.getBBoxes(), parkingStatus.getStatusPredictions(), segmentationGTMask, seg.getSegmentationMaskWithClasses());
 
-        // 2D Map 
+        // 2D Map
         cv::Mat clone = parkingImg.clone();
         Graphics::applyMap(clone, parkingStatus.getOccupiedParkingSpaces());
 
@@ -103,6 +101,6 @@ int main(int argc, char** argv) {
         cv::waitKey(0);
         cv::destroyAllWindows();
     }
-    
+
     return 0;
 }

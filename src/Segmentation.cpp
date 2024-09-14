@@ -94,9 +94,6 @@ Segmentation::Segmentation(const std::filesystem::path &mogTrainingDir,const std
     cv::Mat merge;
     cv::bitwise_and(mog2MaskLab, mog2MaskBGR, merge);
 
-    // Contours elimination in order to remove noise of little objects
-    mog2MaskBGR = contoursElimination(mog2MaskBGR, 300);
-
 
     // BACKGROUND ELIMINATION by taking among all the images the one that has the minimum absolute difference
     bgElimMask = backgroundSubtraction(mogTrainingDir, parkingGray);

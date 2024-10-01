@@ -9,7 +9,13 @@
 
 
 ## Overview
+Many video surveillance systems rely on computer vision algorithms to identify and track objects of interest in input
+videos and generate semantic information. The information obtained from such systems can then be used to monitor parking occupancy over time or
+identify possible cars to be fined for incorrect use of the spaces provided. The goal of this project is to develop a computer vision system for parking lot management, capable of detecting
+vehicles and available parking spaces by analyzing images of parking lots extracted from surveillance camera frames.
 
+The project has 4 main components: localize all parking spaces, classify all parking spaces according to their occupancy, segment cars into correctly parked or "out of place" and , lastly, represent the current status of the parking lot in a 2D top-view visualization map.
+Our implementation has used a selected set of public images taken from the PKLot dataset.
 
 This is a project for the computer vision course given by prof. Ghidoni Stefano in the a.y. 2023/2024
 
@@ -20,10 +26,11 @@ This is a project for the computer vision course given by prof. Ghidoni Stefano 
 
 
 ## Usage
-To run the main program use the python script `main.py` inside the src folder. Such script accepts various optional parameters: 
+In order to manage all dependencies, CMake has been used. Therefore, to obtain the program executable is necessary to:
 
 ```
-usage: main.py [-t T] [-d D] [-p P]
+first: cmake .
+second: cmake --build .
 
 optional arguments:
 - T   type of analysis: 0 = RGB, 1 = ensemble, 2 = PCA (default = 1)

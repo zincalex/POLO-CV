@@ -15,7 +15,7 @@ vehicles and available parking spaces by analyzing images of parking lots extrac
 The project has 4 main components: localize all parking spaces, classify all parking spaces according to their occupancy, segment cars into correctly parked or "out of place" and, lastly, represent the current status of the parking lot in a 2D top-view visualization map.
 Our implementation has used a selected set of public images taken from the PKLot dataset. To have a deeper understanding of our implementation and ideas, try to have a look at [Report](Report.pdf).
 
-This is a project for the computer vision course given by prof. Ghidoni Stefano in the a.y. 2023/2024
+This is a project for the computer vision course given by prof. Ghidoni Stefano in the a.y. 2023/2024.
 
 ## Minimum Requirements 
 - C++ 17.0.0

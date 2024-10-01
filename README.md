@@ -43,8 +43,9 @@ For measuring the system performance we have used mean average precision (mAP) f
 A more detailed analysis of the results is in the [Report](Report.pdf).
 
 <p align="center">
-  <img src="https://github.com/zincalex/Land_Cover_Classification_EUROSAT/blob/main/data/reference_images/densenet161_ENSEMBLE.png" />
+  <img src="https://github.com/zincalex/POLO-CV/blob/main/ParkingLot_dataset/miou_final.png" />
 </p>
 <p align="center">
-  <img src="https://github.com/zincalex/Land_Cover_Classification_EUROSAT/blob/main/data/reference_images/PLOT_densenet161_ENSEMBLE.png" />
+  <img src="https://github.com/zincalex/POLO-CV/blob/main/ParkingLot_dataset/mAP_final.png" />
 </p>
+

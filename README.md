@@ -1,7 +1,5 @@
 ## POLO: Parking Occupancy and Lot Observation - Computer Vision
 ![C++](https://img.shields.io/badge/C%2B%2B-00599C?style=for-the-badge&logo=c%2B%2B&logoColor=white)
-
-## Table of Contents
 - [Overview](#overview)
 - [Requirements](#requirements)
 - [Usage](#usage)
@@ -27,25 +25,18 @@ This is a project for the computer vision course given by prof. Ghidoni Stefano 
 
 ## Usage
 In order to manage all dependencies, CMake has been used. Therefore, to obtain the program executable is necessary to:
-
+```shell 
+$ cmake . 
 ```
-first: cmake .
-second: cmake --build .
-
-optional arguments:
-- T   type of analysis: 0 = RGB, 1 = ensemble, 2 = PCA (default = 1)
-- D   skip dataset creation: 0 = false, 1 = true (default = 0)
-- P   skip PCA version of the dataset: 0 = false, 1 = true (default = 0)
+Then 
+```shell 
+$ cmake --build .
+```
+At this point the main executable is ready at use
+```shell 
+$ ./main  ParkingLot_dataset/sequence0/frames ParkingLot_dataset/sequenceN
 ```
 
-The `-t` option specifies the type of analysis to conduct. Only one analysis for run is possible. 
-
-The `-d` option manages whether the images as numpy arrays are saved in the EUROSAT_numpy directory as a .h5 file. 
-If the option was activated, the dataset is loaded instead of converting each .tif image to numpy array which saves time for multiple runs of the program.
-
-The `-p` option manages whether the PCA rapresentation of the images is saved in the PCA_dataset directory as a .h5 file (useful for multiple runs of the program, in order to save time).
-
-It is suggested to build each compressed dataset once and after that remember to specify the `-d` and `-p` option to be 1. In this way the next runs will be way faster.
 
 ## Results
 A more detailed analysis of the results is in the [Report](Report.pdf).

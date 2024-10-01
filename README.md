@@ -17,10 +17,10 @@ Our implementation has used a selected set of public images taken from the PKLot
 
 This is a project for the computer vision course given by prof. Ghidoni Stefano in the a.y. 2023/2024
 
-## Requirements 
-- Python 3.11.3
-- CUDA 12.4.1
-- PyTorch 2.2.2 +cu121
+## Minimum Requirements 
+- C++ 17.0.0
+- Cmake 3.8
+- OpenCV 4.8
 
 
 ## Usage

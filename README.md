@@ -12,8 +12,8 @@ videos and generate semantic information. The information obtained from such sys
 identify possible cars to be fined for incorrect use of the spaces provided. The goal of this project is to develop a computer vision system for parking lot management, capable of detecting
 vehicles and available parking spaces by analyzing images of parking lots extracted from surveillance camera frames.
 
-The project has 4 main components: localize all parking spaces, classify all parking spaces according to their occupancy, segment cars into correctly parked or "out of place" and , lastly, represent the current status of the parking lot in a 2D top-view visualization map.
-Our implementation has used a selected set of public images taken from the PKLot dataset.
+The project has 4 main components: localize all parking spaces, classify all parking spaces according to their occupancy, segment cars into correctly parked or "out of place" and, lastly, represent the current status of the parking lot in a 2D top-view visualization map.
+Our implementation has used a selected set of public images taken from the PKLot dataset. To have a deeper understanding of our implementation and ideas, try to have a look at [Report](Report.pdf).
 
 This is a project for the computer vision course given by prof. Ghidoni Stefano in the a.y. 2023/2024
 
@@ -39,8 +39,8 @@ $ ./main  ParkingLot_dataset/sequence0/frames ParkingLot_dataset/sequenceN
 
 
 ## Results
+For measuring the system performance we have used mean average precision (mAP) for parking space localization and mean intersection over union (mIoU) for car segmentation.
 A more detailed analysis of the results is in the [Report](Report.pdf).
-The best results have been achived by using DenseNet161 with final accuracy as 96.9%.
 
 <p align="center">
   <img src="https://github.com/zincalex/Land_Cover_Classification_EUROSAT/blob/main/data/reference_images/densenet161_ENSEMBLE.png" />

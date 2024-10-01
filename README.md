@@ -1,45 +1,23 @@
-## POLO: Parking Observation and Lot Observation - Computer Vision
+## POLO: Parking Occupancy and Lot Observation - Computer Vision
 ![C++](https://img.shields.io/badge/C%2B%2B-00599C?style=for-the-badge&logo=c%2B%2B&logoColor=white)
 
 ## Table of Contents
 - [Overview](#overview)
-- [Installation](#installation)
 - [Requirements](#requirements)
 - [Usage](#usage)
 - [Results](#results)
 
 
 ## Overview
-A satellite scans the Earth to acquire images of it. Patches extracted out of these images are used for classification.
-The aim is to automatically provide labels describing the represented physical land type or how the land is used.
 
-EUROSAT dataset has been used for this project and there are in total 27,000 labeled 
-and georeferenced images, with 13 spectral bands each, consisting of 10 different classes.
-The aim of this project is to leverage information extracted from multiple
-bands so as to maximize classification performance. 
-Two main analysis have been conducted: an ensemble DNN and a PCA dimensionality reduction tecnique applied to each image.
 
-This is a project for the course Deep Learning taken by prof. Loris Nanni in the a.y. 2023/2024
+This is a project for the computer vision course given by prof. Ghidoni Stefano in the a.y. 2023/2024
 
 ## Requirements 
 - Python 3.11.3
 - CUDA 12.4.1
 - PyTorch 2.2.2 +cu121
 
-## Installation 
-Given that the device has CUDA installed, the libraries that have been used
-can be downloaded through pip.
-- Basic libraries used
-```shell
-pip install numpy, scikit-learn, h5py, tifffile, matplotlib, tqdm
-```
-- Pytorch download setup
-```shell
-pip install torch==2.2.1 torchvision==0.17.1 torchaudio==2.2.1 --index-url https://download.pytorch.org/whl/cu121
-```
-
-The dataset is open source and is avaiable via Zenovo [here](https://zenodo.org/records/7711810/files/EuroSAT_MS.zip?download=1).
-Then extract the labeled directories, inside the `dataset` directory of this project. Now, you are good to go.
 
 ## Usage
 To run the main program use the python script `main.py` inside the src folder. Such script accepts various optional parameters: 
